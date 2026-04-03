@@ -1,0 +1,282 @@
+[
+  {
+    "rank": 1,
+    "feature_name": "credit_utilization",
+    "human_label": "Credit Utilization",
+    "mean_abs_shap": 0.012787,
+    "description": "This transaction as a fraction of available credit limit",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 2,
+    "feature_name": "amount_vs_user_avg_ratio",
+    "human_label": "Amount vs User Average",
+    "mean_abs_shap": 0.003898,
+    "description": "How many times larger this amount is vs. the user's 7-day average",
+    "icon": "\ud83d\udcb8"
+  },
+  {
+    "rank": 3,
+    "feature_name": "txns_last_1h",
+    "human_label": "Transactions in Last Hour",
+    "mean_abs_shap": 0.002574,
+    "description": "Number of transactions by this user in the past 60 minutes",
+    "icon": "\u26a1"
+  },
+  {
+    "rank": 4,
+    "feature_name": "amount_zscore_user",
+    "human_label": "Amount Z-Score (User)",
+    "mean_abs_shap": 0.002437,
+    "description": "Standard deviations from this user's average spending",
+    "icon": "\ud83d\udcca"
+  },
+  {
+    "rank": 5,
+    "feature_name": "seconds_since_last_txn",
+    "human_label": "Time Since Last Transaction",
+    "mean_abs_shap": 0.00241,
+    "description": "Seconds elapsed since this user's previous transaction",
+    "icon": "\u23f1\ufe0f"
+  },
+  {
+    "rank": 6,
+    "feature_name": "log_amount",
+    "human_label": "Transaction Amount",
+    "mean_abs_shap": 0.000755,
+    "description": "Log-normalized transaction amount",
+    "icon": "\ud83d\udcb0"
+  },
+  {
+    "rank": 7,
+    "feature_name": "is_night",
+    "human_label": "Nighttime Transaction",
+    "mean_abs_shap": 0.000187,
+    "description": "Transaction between 10 PM and 6 AM",
+    "icon": "\ud83c\udf19"
+  },
+  {
+    "rank": 8,
+    "feature_name": "amount_is_round",
+    "human_label": "Round Amount",
+    "mean_abs_shap": 7.9e-05,
+    "description": "Transaction is a suspiciously round number (automated/bot signal)",
+    "icon": "\ud83e\udd16"
+  },
+  {
+    "rank": 9,
+    "feature_name": "has_chip",
+    "human_label": "Chip Card",
+    "mean_abs_shap": 6.5e-05,
+    "description": "Whether the card has an EMV chip (more secure)",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 10,
+    "feature_name": "card_on_dark_web",
+    "human_label": "Dark Web Exposure",
+    "mean_abs_shap": 6.2e-05,
+    "description": "Card number found in known dark web breach databases",
+    "icon": "\ud83c\udf11"
+  },
+  {
+    "rank": 11,
+    "feature_name": "merchant_in_new_city",
+    "human_label": "New City",
+    "mean_abs_shap": 2.1e-05,
+    "description": "First time this user has transacted in this merchant's city",
+    "icon": "\ud83d\udccd"
+  },
+  {
+    "rank": 12,
+    "feature_name": "credit_score",
+    "human_label": "Credit Score",
+    "mean_abs_shap": 1.4e-05,
+    "description": "User's credit score (300\u2013850)",
+    "icon": "\u2b50"
+  },
+  {
+    "rank": 13,
+    "feature_name": "card_age_days",
+    "human_label": "Card Age",
+    "mean_abs_shap": 1.1e-05,
+    "description": "Number of days since the card account was opened",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 14,
+    "feature_name": "current_age",
+    "human_label": "User Age",
+    "mean_abs_shap": 1e-05,
+    "description": "Current age of the account holder",
+    "icon": "\ud83d\udc64"
+  },
+  {
+    "rank": 15,
+    "feature_name": "amount_vs_credit_limit_ratio",
+    "human_label": "Credit Limit Usage",
+    "mean_abs_shap": 1e-06,
+    "description": "Transaction amount as a fraction of card credit limit",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 16,
+    "feature_name": "is_month_end",
+    "human_label": "Month-End Transaction",
+    "mean_abs_shap": 0.0,
+    "description": "Transaction on or after the 28th of the month",
+    "icon": "\ud83d\udcc5"
+  },
+  {
+    "rank": 17,
+    "feature_name": "quarter",
+    "human_label": "Quarter",
+    "mean_abs_shap": 0.0,
+    "description": "Fiscal quarter of the transaction",
+    "icon": "\ud83d\udcc5"
+  },
+  {
+    "rank": 18,
+    "feature_name": "user_avg_amount_7d",
+    "human_label": "User 7-Day Average",
+    "mean_abs_shap": 0.0,
+    "description": "User's average transaction amount over the past 7 days",
+    "icon": "\ud83d\udcca"
+  },
+  {
+    "rank": 19,
+    "feature_name": "month",
+    "human_label": "Month",
+    "mean_abs_shap": 0.0,
+    "description": "Calendar month of the transaction",
+    "icon": "\ud83d\udcc5"
+  },
+  {
+    "rank": 20,
+    "feature_name": "is_weekend",
+    "human_label": "Weekend Transaction",
+    "mean_abs_shap": 0.0,
+    "description": "Transaction occurred on Saturday or Sunday",
+    "icon": "\ud83d\udcc5"
+  },
+  {
+    "rank": 21,
+    "feature_name": "day_of_week",
+    "human_label": "Day of Week",
+    "mean_abs_shap": 0.0,
+    "description": "Day of week (0=Monday \u2026 6=Sunday)",
+    "icon": "\ud83d\udcc5"
+  },
+  {
+    "rank": 22,
+    "feature_name": "amount_decile",
+    "human_label": "Amount Percentile Band",
+    "mean_abs_shap": 0.0,
+    "description": "Which 10th-percentile band the transaction amount falls into",
+    "icon": "\ud83d\udcca"
+  },
+  {
+    "rank": 23,
+    "feature_name": "merchant_state_encoded",
+    "human_label": "Merchant State",
+    "mean_abs_shap": 0.0,
+    "description": "Encoded US state where the merchant is located",
+    "icon": "\ud83d\udccd"
+  },
+  {
+    "rank": 24,
+    "feature_name": "user_std_amount_7d",
+    "human_label": "Spending Volatility",
+    "mean_abs_shap": 0.0,
+    "description": "Standard deviation of user's spending over the past 7 days",
+    "icon": "\ud83d\udcca"
+  },
+  {
+    "rank": 25,
+    "feature_name": "user_txn_count_24h",
+    "human_label": "24-Hour Transaction Count",
+    "mean_abs_shap": 0.0,
+    "description": "Number of transactions by this user in the past 24 hours",
+    "icon": "\ud83d\udd22"
+  },
+  {
+    "rank": 26,
+    "feature_name": "is_foreign_transaction",
+    "human_label": "Out-of-State Transaction",
+    "mean_abs_shap": 0.0,
+    "description": "Transaction state differs from the user's home state",
+    "icon": "\ud83d\uddfa\ufe0f"
+  },
+  {
+    "rank": 27,
+    "feature_name": "is_rapid_succession",
+    "human_label": "Rapid Succession",
+    "mean_abs_shap": 0.0,
+    "description": "Transaction occurred less than 60 seconds after the previous one",
+    "icon": "\u26a1"
+  },
+  {
+    "rank": 28,
+    "feature_name": "days_since_pin_change",
+    "human_label": "Days Since PIN Change",
+    "mean_abs_shap": 0.0,
+    "description": "Days elapsed since the card PIN was last changed",
+    "icon": "\ud83d\udd12"
+  },
+  {
+    "rank": 29,
+    "feature_name": "card_type_encoded",
+    "human_label": "Card Type",
+    "mean_abs_shap": 0.0,
+    "description": "Type of card: credit (0), debit (1), or prepaid (2)",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 30,
+    "feature_name": "num_cards_issued",
+    "human_label": "Cards on Account",
+    "mean_abs_shap": 0.0,
+    "description": "Total number of cards issued on this account",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 31,
+    "feature_name": "debt_to_income_ratio",
+    "human_label": "Debt-to-Income Ratio",
+    "mean_abs_shap": 0.0,
+    "description": "User's total debt as a fraction of annual income",
+    "icon": "\ud83d\udcca"
+  },
+  {
+    "rank": 32,
+    "feature_name": "num_credit_cards",
+    "human_label": "Number of Credit Cards",
+    "mean_abs_shap": 0.0,
+    "description": "Total number of credit cards held by this user",
+    "icon": "\ud83d\udcb3"
+  },
+  {
+    "rank": 33,
+    "feature_name": "mcc_description_encoded",
+    "human_label": "Merchant Category",
+    "mean_abs_shap": 0.0,
+    "description": "Encoded merchant category code (MCC)",
+    "icon": "\ud83c\udfea"
+  },
+  {
+    "rank": 34,
+    "feature_name": "is_high_risk_mcc",
+    "human_label": "High-Risk Merchant",
+    "mean_abs_shap": 0.0,
+    "description": "Merchant falls in a high-risk category (gambling, crypto, wire transfer, etc.)",
+    "icon": "\u26a0\ufe0f"
+  },
+  {
+    "rank": 35,
+    "feature_name": "hour_of_day",
+    "human_label": "Transaction Hour",
+    "mean_abs_shap": 0.0,
+    "description": "Hour of day the transaction occurred (0\u201323)",
+    "icon": "\ud83d\udd50"
+  }
+]
