@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
   ShieldAlert, 
-  EyeOff, 
   UserRound, 
   FileText, 
   Newspaper, 
@@ -17,7 +16,8 @@ import {
   LogOut,
   ChevronDown,
   CreditCard,
-  User
+  User,
+  Network
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -25,10 +25,10 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "ThreatGuard", icon: ShieldAlert, href: "/dashboard/alerts" },
-  { label: "Steganography", icon: EyeOff, href: "/dashboard/stego", comingSoon: true },
-  { label: "Deepfake", icon: UserRound, href: "/dashboard/deepfake", comingSoon: true },
+  { label: "Graph Rings", icon: Network, href: "/dashboard/rings" },
+  { label: "Deepfake", icon: UserRound, href: "/dashboard/deepfake" },
   { label: "News", icon: Newspaper, href: "/dashboard/news" },
-  { label: "Community", icon: Users, href: "/dashboard/community", comingSoon: true },
+  { label: "Community", icon: Users, href: "/dashboard/community" },
   { label: "Ledger", icon: CreditCard, href: "/dashboard/transactions" },
 ];
 
@@ -84,12 +84,7 @@ export default function Header() {
                 )}
               >
                 <item.icon size={14} className={cn(isActive ? "text-primary" : "text-muted-foreground")} />
-                <div className="flex items-center space-x-1.5">
-                  <span>{item.label}</span>
-                  {item.comingSoon && (
-                    <span className="px-1 py-[1px] rounded bg-white/5 border border-white/10 text-[7px] text-muted-foreground">SOON</span>
-                  )}
-                </div>
+                <span>{item.label}</span>
               </Link>
             );
           })}
