@@ -14,4 +14,6 @@ const NetworkGraphInner = dynamic(
   }
 );
 
-export default NetworkGraphInner;
+export default function NetworkGraph({ transactions, onNodeSelect }: { transactions: any[], onNodeSelect?: (node: any) => void }) {
+  return <NetworkGraphInner transactions={transactions} onNodeSelect={onNodeSelect} />;
+}

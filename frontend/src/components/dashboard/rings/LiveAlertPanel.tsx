@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { FraudTransaction } from "@/data/fraudData";
-import { AlertCircle, ShieldAlert, Zap } from "lucide-react";
+import { AlertCircle, ShieldAlert, Zap, TrendingUp } from "lucide-react";
 
 interface LiveAlertPanelProps {
   transactions: FraudTransaction[];
@@ -24,10 +24,24 @@ export default function LiveAlertPanel({ transactions }: LiveAlertPanelProps) {
        .map(([mId]) => ({
           id: `ring-${mId}`,
           type: "RING",
-          title: `🚨 Fraud Ring Detected: ${mId}`,
+          title: "🚨 Fraud Ring Detected",
           merchant: mId,
-          reason: "Multiple critical block rules triggered on single merchant."
+          user: undefined,
+          color: "bg-error/10 border-error/20 text-error",
+          reason: "Multiple critical block rules triggered on single merchant cluster."
        }));
+
+    // Detect Money Laundering Chains
+    const mlTXs = transactions.filter(t => t.scenario_type === "money_laundering");
+    const mlAlerts = mlTXs.length > 0 ? [{
+       id: "aml-cycle-1",
+       type: "AML",
+       title: "🌀 AML Cycle Detected",
+       merchant: "CIRCULAR FLOW",
+       user: "MULTI-NODE",
+       color: "bg-[#a855f7]/20 border-[#a855f7]/40 text-[#a855f7]",
+       reason: "Circular fund movement across 5+ accounts [Layering detected]."
+    }] : [];
 
     const txAlerts = blocks.map(t => ({
       id: t.transaction_id,
@@ -35,11 +49,14 @@ export default function LiveAlertPanel({ transactions }: LiveAlertPanelProps) {
       type: "TX",
       title: "🚨 Fraud Detected",
       merchant: t.merchant_id,
+      color: "bg-error/10 border-error/20 text-error",
       reason: `Risk Score High (${(t.final_risk_score * 100).toFixed(1)}%)`,
     }));
 
-    // Specific ordering: Rings first, then individual blocks
-    return [...ringAlerts, ...txAlerts].slice(0, 10);
+    const sortedTxAlerts = [...txAlerts].reverse();
+
+    // Specific ordering: AML first (Critical), then Rings, then newest individual blocks
+    return [...mlAlerts, ...ringAlerts, ...sortedTxAlerts].slice(0, 10);
   }, [transactions]);
 
   return (
@@ -57,21 +74,21 @@ export default function LiveAlertPanel({ transactions }: LiveAlertPanelProps) {
              </div>
           ) : (
              alerts.map(alert => (
-               <div key={alert.id} className="p-4 rounded-2xl bg-error/10 border border-error/20 animate-in fade-in slide-in-from-bottom-2 duration-300">
+               <div key={alert.id} className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-300 ${alert.color}`}>
                   <div className="flex items-start justify-between">
-                     <h4 className="text-xs font-bold font-space uppercase tracking-tight text-white mb-2 flex items-center gap-2">
-                        {alert.type === "RING" ? <Zap size={14} className="text-error" /> : <AlertCircle size={14} className="text-error" />}
+                     <h4 className={`text-xs font-bold font-space uppercase tracking-tight mb-2 flex items-center gap-2 ${alert.type === "AML" ? "text-white" : "text-white"}`}>
+                        {alert.type === "RING" ? <Zap size={14} /> : alert.type === "AML" ? <TrendingUp size={14} className="text-[#a855f7]" /> : <AlertCircle size={14} />}
                         {alert.title}
                      </h4>
                   </div>
                   <div className="flex flex-col gap-1.5 mb-2">
                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-[#ef4444]" title="User Status: Blocked" />
-                        <p className="text-[10px] text-white/70 font-mono">{alert.type === "RING" ? "MULTI-NODE CLUSTER" : `USER: ${alert.user || 'ANALYST'}`}</p>
+                        <div className={`h-2 w-2 rounded-full ${alert.type === "AML" ? "bg-[#a855f7]" : "bg-[#ef4444]"}`} title="Node Status" />
+                        <p className="text-[10px] text-white/70 font-mono">{alert.user || "ANALYST"}</p>
                      </div>
                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-[#6366f1]" title="Merchant Status: Active" />
-                        <p className="text-[10px] text-error font-bold uppercase tracking-widest">Target: {alert.merchant}</p>
+                        <div className="h-2 w-2 rounded-full bg-[#6366f1]" title="Merchant Status" />
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${alert.type === "AML" ? "text-[#a855f7]" : "text-error"}`}>Target: {alert.merchant}</p>
                      </div>
                   </div>
                   <p className="text-[10px] text-white/50">{alert.reason}</p>
