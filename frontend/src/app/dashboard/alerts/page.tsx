@@ -94,7 +94,7 @@ export default function AlertsPage() {
         </div>
 
         <div className="flex items-center space-x-3">
-           <div className="glass px-5 py-3 rounded-2xl border border-white/5 flex items-center space-x-4">
+           <div className="glass px-5 py-3 rounded-2xl border border-black/10 flex items-center space-x-4">
               <History size={16} className="text-primary/60" />
               <div className="flex flex-col">
                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Last Audit</span>
@@ -108,16 +108,16 @@ export default function AlertsPage() {
         {/* Main Feed */}
         <div className="lg:col-span-2 space-y-6">
            {/* Filters Bar */}
-           <div className="glass rounded-[1.5rem] p-4 border border-white/5 flex items-center justify-between gap-4">
+           <div className="glass rounded-[1.5rem] p-4 border border-black/10 flex items-center justify-between gap-4">
               <div className="relative flex-1 group">
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/40 group-focus-within:text-primary transition-colors" />
                  <input 
                     type="text" 
                     placeholder="Search by Entity or ID..." 
-                    className="h-12 w-full rounded-2xl bg-white/[0.03] border border-white/5 pl-12 pr-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20"
+                    className="h-12 w-full rounded-2xl bg-slate-100 border border-black/10 pl-12 pr-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20"
                  />
               </div>
-              <button className="h-12 w-12 rounded-2xl glass border border-white/5 flex items-center justify-center text-muted-foreground hover:bg-white/5">
+              <button className="h-12 w-12 rounded-2xl glass border border-black/10 flex items-center justify-center text-muted-foreground hover:bg-slate-100">
                  <Filter size={18} />
               </button>
            </div>
@@ -132,7 +132,7 @@ export default function AlertsPage() {
                    transition={{ delay: idx * 0.1 }}
                    onClick={() => setSelectedAlert(alert.id)}
                    className={cn(
-                     "glass-card cursor-pointer relative overflow-hidden p-6 rounded-3xl border border-white/5 transition-all duration-300 hover:bg-white/[0.04]",
+                     "glass-card cursor-pointer relative overflow-hidden p-6 rounded-3xl border border-black/10 transition-all duration-300 hover:bg-slate-100",
                      selectedAlert === alert.id && "ring-1 ring-primary/40 bg-white/[0.05]"
                    )}
                 >
@@ -182,7 +182,7 @@ export default function AlertsPage() {
 
         {/* Intelligence Sidepanel */}
         <div className="space-y-6">
-           <div className="glass-card rounded-[2rem] p-8 border border-white/5 sticky top-24">
+           <div className="glass-card rounded-[2rem] p-8 border border-black/10 sticky top-24">
               <div className="flex items-center space-x-3 mb-8">
                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                     <Zap size={20} />
@@ -200,22 +200,22 @@ export default function AlertsPage() {
                    </div>
 
                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                      <div className="p-4 rounded-2xl bg-slate-100 border border-black/10">
                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Status</span>
                          <span className="text-xs font-bold text-foreground">PENDING REVIEW</span>
                       </div>
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                      <div className="p-4 rounded-2xl bg-slate-100 border border-black/10">
                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Assignee</span>
                          <span className="text-xs font-bold text-foreground">Analyst-01</span>
                       </div>
                    </div>
 
-                   <div className="space-y-3 pt-6 border-t border-white/5">
+                   <div className="space-y-3 pt-6 border-t border-black/10">
                       <button className="w-full h-14 rounded-2xl bg-error text-white text-[10px] font-bold font-space uppercase tracking-[0.2em] hover:bg-error/90 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-error/10">
                          <XCircle size={16} />
                          <span>Execute Block</span>
                       </button>
-                      <button className="w-full h-14 rounded-2xl glass border border-white/10 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.2em] hover:bg-white/5 transition-all flex items-center justify-center space-x-2">
+                      <button className="w-full h-14 rounded-2xl glass border border-black/15 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.2em] hover:bg-slate-100 transition-all flex items-center justify-center space-x-2">
                          <CheckCircle size={16} className="text-secondary" />
                          <span>Dismiss / False Pos</span>
                       </button>

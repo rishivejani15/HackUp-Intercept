@@ -36,7 +36,7 @@ const RiskGauge = ({ value, label }: { value: number, label: string }) => (
   <div className="flex items-center space-x-4">
     <div className="relative h-12 w-12 flex items-center justify-center">
        <svg className="absolute inset-0 h-full w-full rotate-[-90deg]">
-          <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-white/5" />
+          <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-black/10" />
           <circle 
             cx="24" cy="24" r="20" 
             stroke="currentColor" strokeWidth="3" fill="transparent" 
@@ -45,11 +45,11 @@ const RiskGauge = ({ value, label }: { value: number, label: string }) => (
             strokeDashoffset={126 - (126 * value) / 100}
           />
        </svg>
-       <span className="text-[10px] font-bold font-space text-white">{value}%</span>
+      <span className="text-[10px] font-bold font-space text-foreground">{value}%</span>
     </div>
     <div>
        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</div>
-       <div className="text-xs font-bold text-white uppercase">System Balanced</div>
+      <div className="text-xs font-bold text-foreground uppercase">System Balanced</div>
     </div>
   </div>
 );
@@ -66,7 +66,7 @@ const CapitalFlow = () => (
           <span>{item.label}</span>
           <span>Active</span>
         </div>
-        <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+        <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
           <motion.div 
             initial={{ x: "-100%" }}
             animate={{ x: "0%" }}
@@ -82,7 +82,7 @@ const CapitalFlow = () => (
 const TelemetryFeed = () => (
    <div className="space-y-2 font-mono text-[9px] text-muted-foreground">
       {[1,2,3,4].map(i => (
-        <div key={i} className="flex items-center space-x-2 border-b border-white/5 pb-1 last:border-0 opacity-80">
+        <div key={i} className="flex items-center space-x-2 border-b border-black/10 pb-1 last:border-0 opacity-80">
           <span className="text-secondary font-bold">[{new Date().toLocaleTimeString().split(' ')[0]}]</span>
           <span>SIG_DETECTED: AUTH_LAYER_{i}</span>
           <span className="ml-auto text-primary">0.0{i}ms</span>
@@ -111,7 +111,7 @@ export default function Hero() {
             transition={{ duration: 0.8 }}
             className="space-y-8"
           >
-            <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full glass border border-white/10 text-[10px] font-bold font-space uppercase tracking-[0.3em] text-primary">
+            <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full glass border border-black/15 text-[10px] font-bold font-space uppercase tracking-[0.3em] text-primary">
               <ShieldCheck size={14} />
               <span>Neural Defense Active</span>
             </div>
@@ -136,7 +136,7 @@ export default function Hero() {
                 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </Link>
               
-              <button className="h-16 px-10 rounded-2xl glass border border-white/10 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-white/5 transition-all flex items-center justify-center space-x-3 group">
+              <button className="h-16 px-10 rounded-2xl glass border border-black/15 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-slate-100 transition-all flex items-center justify-center space-x-3 group">
                 <Play size={16} className="fill-current" />
                 <span>Watch Analysis demo</span>
               </button>
@@ -151,15 +151,15 @@ export default function Hero() {
           transition={{ delay: 0.4, duration: 1 }}
           className="w-full max-w-6xl h-[500px] relative p-2"
         >
-          <div className="h-full w-full glass rounded-[3rem] p-8 border border-white/5 grid grid-cols-12 grid-rows-6 gap-4 relative overflow-hidden">
+          <div className="h-full w-full glass rounded-[3rem] p-8 border border-black/10 grid grid-cols-12 grid-rows-6 gap-4 relative overflow-hidden">
              
              {/* Central Focal Point (Neural Orb) */}
              <div className="col-span-12 row-span-4 lg:col-span-6 lg:row-span-6 flex items-center justify-center relative">
                 <div className="absolute inset-0 bg-primary/5 rounded-full blur-[100px] " />
                 
                 {/* Orbital Rings */}
-                <div className="absolute h-64 w-64 rounded-full border border-white/5 orbital opacity-20" />
-                <div className="absolute h-48 w-48 rounded-full border border-white/10 orbital [animation-duration:10s] opacity-40" />
+                <div className="absolute h-64 w-64 rounded-full border border-black/10 orbital opacity-20" />
+                <div className="absolute h-48 w-48 rounded-full border border-black/15 orbital [animation-duration:10s] opacity-40" />
                 
                 {/* Core Orb */}
                 <div className="relative h-40 w-40 rounded-full bg-gradient-to-br from-primary via-secondary to-primary p-[1px] animate-pulse">
@@ -214,8 +214,8 @@ export default function Hero() {
                         { label: "Capital Vault Alpha", active: false },
                       ].map((item, i) => (
                         <div key={i} className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest">
-                           <div className={cn("h-2 w-2 rounded-full", item.active ? "bg-secondary animate-pulse" : "bg-white/10")} />
-                           <span className={item.active ? "text-white" : "text-muted-foreground"}>{item.label}</span>
+                           <div className={cn("h-2 w-2 rounded-full", item.active ? "bg-secondary animate-pulse" : "bg-slate-200")} />
+                           <span className={item.active ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
                         </div>
                       ))}
                    </div>

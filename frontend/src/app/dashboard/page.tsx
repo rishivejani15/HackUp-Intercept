@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import KPICard from "@/components/dashboard/KPICard";
 import RiskHistogram from "@/components/dashboard/RiskHistogram";
@@ -12,12 +12,69 @@ import {
   Zap, 
   Target,
   ChevronRight,
-  Shield
+  Shield,
+  Key,
+  Copy
 } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { generateSimulatorCode, LOCAL_SIM_CODE_CACHE } from "@/lib/simulatorCode";
 
 export default function DashboardPage() {
+  const [issuedKey, setIssuedKey] = useState("");
+  const [keyMessage, setKeyMessage] = useState("");
+  const [keyLoading, setKeyLoading] = useState(false);
+
+  const handleGetKey = async () => {
+    if (keyLoading) return;
+
+    setKeyLoading(true);
+    setKeyMessage("");
+
+    try {
+      const localCode = generateSimulatorCode();
+      setIssuedKey(localCode);
+      window.localStorage.setItem(LOCAL_SIM_CODE_CACHE, localCode);
+      setKeyMessage("Unique simulator code generated successfully.");
+    } catch {
+      setKeyMessage("Unable to generate code right now. Please retry.");
+    } finally {
+      setKeyLoading(false);
+    }
+  };
+
+  const handleRegenerateKey = async () => {
+    if (keyLoading) return;
+
+    const confirmed = window.confirm(
+      "Regenerate simulator code? Your previous code will be replaced."
+    );
+    if (!confirmed) return;
+
+    setKeyLoading(true);
+    setKeyMessage("");
+
+    try {
+      const localCode = generateSimulatorCode();
+      setIssuedKey(localCode);
+      window.localStorage.setItem(LOCAL_SIM_CODE_CACHE, localCode);
+      setKeyMessage("Simulator code regenerated successfully.");
+    } catch {
+      setKeyMessage("Unable to regenerate code right now. Please retry.");
+    } finally {
+      setKeyLoading(false);
+    }
+  };
+
+  const copyKey = async () => {
+    if (!issuedKey) return;
+    try {
+      await navigator.clipboard.writeText(issuedKey);
+      setKeyMessage("Key copied. Paste it in Test Simulator.");
+    } catch {
+      setKeyMessage("Copy failed. Please copy manually.");
+    }
+  };
+
   return (
     <DashboardLayout>
       {/* Hero Section */}
@@ -40,16 +97,63 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center space-x-4">
-           <div className="glass px-6 py-3 rounded-2xl border border-white/5 flex items-center space-x-4">
+           <div className="glass px-6 py-3 rounded-2xl border border-black/10 flex items-center space-x-4">
               <div className="flex flex-col">
                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Threat Level</span>
                  <span className="text-xs font-bold text-error uppercase glow-error">Elevated Risk</span>
               </div>
-              <div className="h-8 w-[1px] bg-white/10" />
+              <div className="h-8 w-[1px] bg-slate-200" />
               <Shield className="text-error animate-pulse" size={18} />
            </div>
+
+           <button
+             onClick={handleGetKey}
+             disabled={keyLoading}
+             className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-bold font-space uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center space-x-2 disabled:opacity-60"
+           >
+             <Key size={14} />
+             <span>{keyLoading ? "Generating..." : "Get Code"}</span>
+           </button>
         </div>
       </div>
+
+      {(issuedKey || keyMessage) ? (
+        <div className="glass-card rounded-2xl border border-black/10 p-5 mb-8 flex flex-col md:flex-row md:items-center gap-4 justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold font-space uppercase tracking-[0.2em] text-primary">Simulator Access Code</p>
+            {issuedKey ? (
+              <p className="text-xs font-mono font-bold text-foreground break-all">{issuedKey}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground font-medium">Generate a code and paste it in the simulator page.</p>
+            )}
+            {keyMessage ? <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{keyMessage}</p> : null}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRegenerateKey}
+              disabled={keyLoading}
+              className="h-10 px-4 rounded-xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest flex items-center gap-2 disabled:opacity-60"
+            >
+              Regenerate Code
+            </button>
+            {issuedKey ? (
+              <button
+                onClick={copyKey}
+                className="h-10 px-4 rounded-xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest flex items-center gap-2"
+              >
+                <Copy size={12} />
+                Copy Code
+              </button>
+            ) : null}
+            <Link
+              href="/test-simulator"
+              className="h-10 px-4 rounded-xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest flex items-center"
+            >
+              Open Test Simulator
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       {/* KPI Cards Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -92,7 +196,7 @@ export default function DashboardPage() {
         <div className="glass-card rounded-[2rem] p-10 relative overflow-hidden group">
           <div className="flex items-center justify-between mb-8">
              <h2 className="text-xl font-bold font-space uppercase tracking-wider">Risk Distribution</h2>
-             <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-muted-foreground">
+             <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-muted-foreground">
                 <ChevronRight size={16} />
              </div>
           </div>
@@ -102,7 +206,7 @@ export default function DashboardPage() {
         <div className="glass-card rounded-[2rem] p-10 relative overflow-hidden group">
           <div className="flex items-center justify-between mb-8">
              <h2 className="text-xl font-bold font-space uppercase tracking-wider">Influence Vectors</h2>
-             <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-muted-foreground">
+             <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-muted-foreground">
                 <ChevronRight size={16} />
              </div>
           </div>
@@ -121,7 +225,7 @@ export default function DashboardPage() {
             <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">Monitoring real-time behavioral streams across global endpoints.</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Link href="/dashboard/transactions" className="h-12 px-6 rounded-2xl glass border border-white/10 text-[10px] font-bold font-space uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center">
+            <Link href="/dashboard/transactions" className="h-12 px-6 rounded-2xl glass border border-black/15 text-[10px] font-bold font-space uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center justify-center">
               Full Spectrum Ledger
             </Link>
             <button className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-bold font-space uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center">

@@ -13,7 +13,7 @@ const TICKER_ITEMS = [
 
 export default function LiveTicker() {
   return (
-    <div className="bg-white/[0.02] border-y border-white/5 py-3 overflow-hidden select-none relative z-40">
+    <div className="bg-slate-100 border-y border-black/10 py-3 overflow-hidden select-none relative z-40">
       <div className="flex animate-marquee whitespace-nowrap">
         {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, idx) => (
           <div key={idx} className="flex items-center space-x-6 mx-12">
@@ -21,7 +21,7 @@ export default function LiveTicker() {
             <span className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] text-muted-foreground/80">
               {item.text}
             </span>
-            <span className="text-white/10 ml-6">•</span>
+            <span className="text-slate-300 ml-6">•</span>
           </div>
         ))}
       </div>

@@ -80,7 +80,7 @@ export default function KPICard({
       </div>
       
       {/* Micro-Progress Bar */}
-      <div className="absolute bottom-0 left-0 h-1 bg-white/[0.03] w-full">
+      <div className="absolute bottom-0 left-0 h-1 bg-slate-100 w-full">
          <div className={cn(
            "h-full transition-all duration-1000 w-2/3",
            color === "primary" ? "bg-primary/40" : 

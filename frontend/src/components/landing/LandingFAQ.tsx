@@ -20,7 +20,7 @@ const FAQS = [
 
 export default function LandingFAQ() {
   return (
-    <section id="faq" className="py-32 bg-white/[0.01]">
+    <section id="faq" className="py-32 bg-slate-100">
       <div className="container mx-auto px-6 max-w-4xl">
         <div className="text-center mb-16">
           <div className="text-[10px] font-bold font-space uppercase tracking-[0.4em] text-primary mb-4">Support Intelligence</div>
@@ -29,7 +29,7 @@ export default function LandingFAQ() {
         
         <div className="space-y-4">
           {FAQS.map((faq, idx) => (
-            <div key={idx} className="glass p-8 rounded-3xl border border-white/5 group hover:border-white/10 transition-all cursor-pointer">
+            <div key={idx} className="glass p-8 rounded-3xl border border-black/10 group hover:border-black/15 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-space uppercase tracking-tight">{faq.q}</h3>
                 <Plus className="text-primary group-hover:rotate-45 transition-transform duration-300" />

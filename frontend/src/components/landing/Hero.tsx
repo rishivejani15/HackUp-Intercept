@@ -36,7 +36,7 @@ const RiskGauge = ({ value, label }: { value: number, label: string }) => (
   <div className="flex items-center space-x-4">
     <div className="relative h-12 w-12 flex items-center justify-center">
        <svg className="absolute inset-0 h-full w-full rotate-[-90deg]">
-          <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-white/5" />
+          <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-black/10" />
           <circle 
             cx="24" cy="24" r="20" 
             stroke="currentColor" strokeWidth="3" fill="transparent" 
@@ -45,11 +45,11 @@ const RiskGauge = ({ value, label }: { value: number, label: string }) => (
             strokeDashoffset={126 - (126 * value) / 100}
           />
        </svg>
-       <span className="text-[10px] font-bold font-space text-white">{value}%</span>
+      <span className="text-[10px] font-bold font-space text-foreground">{value}%</span>
     </div>
     <div className="flex flex-col">
        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</div>
-       <div className="text-[10px] font-bold text-white uppercase opacity-80">Synced</div>
+      <div className="text-[10px] font-bold text-foreground uppercase opacity-80">Synced</div>
     </div>
   </div>
 );
@@ -66,7 +66,7 @@ const CapitalFlow = () => (
           <span>{item.label}</span>
           <span>Active</span>
         </div>
-        <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+        <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
           <motion.div 
             initial={{ x: "-100%" }}
             animate={{ x: "0%" }}
@@ -86,12 +86,12 @@ const TelemetryFeed = () => {
      setMounted(true);
    }, []);
 
-   if (!mounted) return <div className="animate-pulse bg-white/5 h-20 rounded-xl" />;
+   if (!mounted) return <div className="animate-pulse bg-slate-100 h-20 rounded-xl" />;
 
    return (
       <div className="space-y-2 font-mono text-[9px] text-muted-foreground">
          {[1,2,3,4].map(i => (
-           <div key={i} className="flex items-center space-x-2 border-b border-white/5 pb-1 last:border-0 opacity-80">
+           <div key={i} className="flex items-center space-x-2 border-b border-black/10 pb-1 last:border-0 opacity-80">
              <span className="text-secondary font-bold">[{new Date().toLocaleTimeString().split(' ')[0]}]</span>
              <span>SIG_DETECTED: AUTH_{i}</span>
              <span className="ml-auto text-primary">0.0{i}ms</span>
@@ -104,6 +104,8 @@ const TelemetryFeed = () => {
 // --- Main Hero ---
 
 export default function Hero() {
+  const heroVideoPath = "/videos/hero_video.mp4";
+
   return (
     <section className="relative min-h-[95vh] flex items-center justify-center overflow-hidden pt-12 pb-20">
       {/* Background Grids */}
@@ -114,44 +116,63 @@ export default function Hero() {
 
       <div className="container mx-auto px-6 relative z-10 flex flex-col items-center">
         {/* Intro */}
-        <div className="text-center max-w-4xl mx-auto mb-16 px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="space-y-8"
-          >
-            <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full glass border border-white/10 text-[10px] font-bold font-space uppercase tracking-[0.3em] text-primary">
-              <ShieldCheck size={14} />
-              <span>Neural Defense Active</span>
-            </div>
+        <div className="w-full max-w-7xl mx-auto mb-14 px-2 md:px-4">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 xl:gap-20 items-start xl:items-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="xl:col-span-6 xl:pr-4 space-y-8 text-left"
+            >
+              <h1 className="text-5xl md:text-[6.5rem] font-bold font-space tracking-tighter leading-[0.85] text-foreground">
+                NEURAL PROTECTION <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-gradient pb-2 inline-block">
+                  AGAINST FRAUD.
+                </span>
+              </h1>
 
-            <h1 className="text-5xl md:text-[6.5rem] font-bold font-space tracking-tighter leading-[0.85] text-foreground">
-              NEURAL PROTECTION <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-gradient pb-2 inline-block">
-                AGAINST FRAUD.
-              </span>
-            </h1>
+              <p className="max-w-2xl text-lg text-muted-foreground font-medium leading-relaxed">
+                Autonomous financial intelligence built to neutralize cross-border threats at the speed of capital flow.
+              </p>
 
-            <p className="max-w-2xl mx-auto text-lg text-muted-foreground font-medium leading-relaxed">
-              Autonomous financial intelligence built to neutralize cross-border threats at the speed of capital flow.
-            </p>
+              <div className="flex flex-col sm:flex-row items-start gap-4 pt-0">
+                <Link
+                  href="/signup"
+                  className="h-16 px-10 rounded-2xl bg-primary text-primary-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-lg flex items-center justify-center space-x-3 group"
+                >
+                  <span>Initialize Vault</span>
+                  <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link 
-                href="/signup" 
-                className="h-16 px-10 rounded-2xl bg-primary text-primary-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-lg flex items-center justify-center space-x-3 group"
-              >
-                <span>Initialize Vault</span>
-                <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-              
-              <button className="h-16 px-10 rounded-2xl glass border border-white/10 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-white/5 transition-all flex items-center justify-center space-x-3 group">
-                <Play size={16} className="fill-current" />
-                <span>Watch Analysis Demo</span>
-              </button>
-            </div>
-          </motion.div>
+                <button className="h-16 px-10 rounded-2xl glass border border-black/15 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-slate-100 transition-all flex items-center justify-center space-x-3 group">
+                  <Play size={16} className="fill-current" />
+                  <span>Watch Analysis Demo</span>
+                </button>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+              className="xl:col-span-6 xl:self-center xl:-mt-26"
+            >
+              <div className="max-w-[760px] xl:ml-0">
+                <div className="aspect-[4/3] overflow-hidden rounded-[1.75rem] bg-slate-100 shadow-xl shadow-primary/10">
+                  <video
+                    className="h-full w-full object-cover"
+                    src={heroVideoPath}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
 
         {/* Neural Grid Dashboard (NO IMAGES) */}
@@ -161,15 +182,15 @@ export default function Hero() {
           transition={{ delay: 0.4, duration: 1 }}
           className="w-full max-w-6xl h-auto relative p-2"
         >
-          <div className="w-full glass rounded-[3rem] p-8 border border-white/5 grid grid-cols-1 md:grid-cols-12 gap-4 relative overflow-hidden">
+          <div className="w-full glass rounded-[3rem] p-8 border border-black/10 grid grid-cols-1 md:grid-cols-12 gap-4 relative overflow-hidden">
              
              {/* Central Focal Point (Neural Orb) */}
              <div className="md:col-span-12 lg:col-span-6 flex items-center justify-center py-10 relative">
                 <div className="absolute inset-0 bg-primary/5 rounded-full blur-[100px] " />
                 
                 {/* Orbital Rings */}
-                <div className="absolute h-64 w-64 rounded-full border border-white/5 orbital opacity-20" />
-                <div className="absolute h-48 w-48 rounded-full border border-white/10 orbital [animation-duration:10s] opacity-40" />
+                <div className="absolute h-64 w-64 rounded-full border border-black/10 orbital opacity-20" />
+                <div className="absolute h-48 w-48 rounded-full border border-black/15 orbital [animation-duration:10s] opacity-40" />
                 
                 {/* Core Orb */}
                 <div className="relative h-40 w-40 rounded-full bg-gradient-to-br from-primary via-secondary to-primary p-[1px] animate-pulse">
@@ -224,8 +245,8 @@ export default function Hero() {
                         { label: "Capital Vault Alpha", active: false },
                       ].map((item, i) => (
                         <div key={i} className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest">
-                           <div className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-secondary animate-pulse" : "bg-white/10")} />
-                           <span className={item.active ? "text-white" : "text-muted-foreground"}>{item.label}</span>
+                           <div className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-secondary animate-pulse" : "bg-slate-200")} />
+                           <span className={item.active ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
                         </div>
                       ))}
                    </div>

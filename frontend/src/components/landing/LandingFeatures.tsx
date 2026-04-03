@@ -68,7 +68,7 @@ export default function LandingFeatures() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
               viewport={{ once: true }}
-              className="glass-card p-10 rounded-[2.5rem] border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden"
+              className="glass-card p-10 rounded-[2.5rem] border border-black/10 hover:border-black/15 transition-all group relative overflow-hidden"
             >
               <div className={`h-16 w-16 rounded-2xl ${feature.bg} flex items-center justify-center ${feature.color} mb-8 group-hover:scale-110 transition-transform duration-500`}>
                 <feature.icon size={28} />

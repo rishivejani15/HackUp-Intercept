@@ -20,7 +20,7 @@ export default function LandingNavbar() {
   return (
     <nav className={cn(
       "fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b",
-      scrolled ? "bg-background/80 backdrop-blur-xl border-white/5 py-4" : "bg-transparent border-transparent py-6"
+      scrolled ? "bg-background/80 backdrop-blur-xl border-black/10 py-4" : "bg-transparent border-transparent py-6"
     )}>
       <div className="max-w-[1400px] mx-auto px-10 md:px-16 lg:px-24 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2 group">
@@ -61,7 +61,7 @@ export default function LandingNavbar() {
           ) : (
             <Link 
               href="/dashboard" 
-              className="h-12 px-6 rounded-2xl bg-white/[0.03] border border-white/10 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.2em] hover:bg-white/5 transition-all flex items-center justify-center space-x-2 group"
+              className="h-12 px-6 rounded-2xl bg-slate-100 border border-black/15 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.2em] hover:bg-slate-100 transition-all flex items-center justify-center space-x-2 group"
             >
               <span>Go to Dashboard</span>
               <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform text-primary" />
@@ -79,7 +79,7 @@ export default function LandingNavbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-background border-b border-white/5 p-6 space-y-4 animate-in slide-in-from-top-4 duration-300">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-background border-b border-black/10 p-6 space-y-4 animate-in slide-in-from-top-4 duration-300">
           {["Features", "Security", "Intelligence", "FAQ"].map((item) => (
             <Link 
               key={item} 

@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="flex items-center space-x-3">
-           <div className="glass px-5 py-3 rounded-2xl border border-white/5 flex items-center space-x-4">
+           <div className="glass px-5 py-3 rounded-2xl border border-black/10 flex items-center space-x-4">
               <Calendar size={16} className="text-primary/60" />
               <div className="flex flex-col">
                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Window</span>
@@ -79,33 +79,33 @@ export default function AnalyticsPage() {
 
       {/* Advanced Macro Metrics */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-3 mb-10">
-         <div className="glass-card p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
+         <div className="glass-card p-6 rounded-3xl border border-black/10 relative overflow-hidden group">
             <div className="flex items-center justify-between mb-2">
                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Fraud Velocity</span>
                <ArrowUpRight size={14} className="text-error" />
             </div>
             <div className="text-2xl font-bold font-space tracking-tight text-foreground mb-4">12.4% <span className="text-xs text-error font-medium ml-1">↑ 2.4%</span></div>
-            <div className="h-1 bg-white/[0.03] rounded-full overflow-hidden">
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                <div className="h-full w-[65%] bg-error/40 rounded-full" />
             </div>
          </div>
-         <div className="glass-card p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
+         <div className="glass-card p-6 rounded-3xl border border-black/10 relative overflow-hidden group">
             <div className="flex items-center justify-between mb-2">
                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Model Precision</span>
                <ShieldCheck size={14} className="text-secondary" />
             </div>
             <div className="text-2xl font-bold font-space tracking-tight text-foreground mb-4">98.2% <span className="text-xs text-secondary font-medium ml-1">↑ 0.5%</span></div>
-            <div className="h-1 bg-white/[0.03] rounded-full overflow-hidden">
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                <div className="h-full w-[98%] bg-secondary/40 rounded-full" />
             </div>
          </div>
-         <div className="glass-card p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
+         <div className="glass-card p-6 rounded-3xl border border-black/10 relative overflow-hidden group">
             <div className="flex items-center justify-between mb-2">
                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Threat Radius</span>
                <Target size={14} className="text-primary" />
             </div>
             <div className="text-2xl font-bold font-space tracking-tight text-foreground mb-4">2.4k <span className="text-xs text-muted-foreground font-medium ml-1">Stable</span></div>
-            <div className="h-1 bg-white/[0.03] rounded-full overflow-hidden">
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                <div className="h-full w-[45%] bg-primary/40 rounded-full" />
             </div>
          </div>
@@ -172,10 +172,10 @@ export default function AnalyticsPage() {
                </div>
             </div>
 
-            <div className="glass-card rounded-[2rem] p-10 border border-white/5">
+            <div className="glass-card rounded-[2rem] p-10 border border-black/10">
                 <div className="flex items-center justify-between mb-8">
                    <h2 className="text-xl font-bold font-space uppercase tracking-wider">Influence Vector Variance</h2>
-                   <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-muted-foreground">
+                   <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-muted-foreground">
                       <ChevronRight size={16} />
                    </div>
                 </div>
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
 
          {/* Technical Context Column (35%) */}
          <div className="space-y-8">
-            <div className="glass-card rounded-[2rem] p-10 border border-white/5 relative overflow-hidden group min-h-[450px]">
+            <div className="glass-card rounded-[2rem] p-10 border border-black/10 relative overflow-hidden group min-h-[450px]">
                <div className="flex items-center justify-between mb-10">
                   <h3 className="text-lg font-bold font-space uppercase tracking-widest text-foreground">Risk Segments</h3>
                   <Target size={18} className="text-primary/40" />
@@ -226,9 +226,9 @@ export default function AnalyticsPage() {
                </div>
             </div>
 
-            <div className="glass-card rounded-[2rem] p-8 border border-white/5 space-y-6">
+            <div className="glass-card rounded-[2rem] p-8 border border-black/10 space-y-6">
                <div className="flex items-center space-x-3">
-                  <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-primary">
+                  <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-primary">
                      <Zap size={16} />
                   </div>
                   <h3 className="text-xs font-bold font-space uppercase tracking-[0.2em]">Compute Status</h3>
@@ -240,7 +240,7 @@ export default function AnalyticsPage() {
                         <span>Neural Load</span>
                         <span>42%</span>
                      </div>
-                     <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full w-[42%] bg-primary/40 rounded-full" />
                      </div>
                   </div>
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
                         <span>I/O Latency</span>
                         <span>0.4ms</span>
                      </div>
-                     <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full w-[15%] bg-secondary/40 rounded-full" />
                      </div>
                   </div>

@@ -6,7 +6,7 @@ import { Shield } from "lucide-react";
 
 export default function LandingFooter() {
   return (
-    <footer className="py-20 border-t border-white/5 relative z-10">
+    <footer className="py-20 border-t border-black/10 relative z-10">
       <div className="max-w-[1400px] mx-auto px-10 md:px-16 lg:px-24">
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1 space-y-6">
@@ -58,7 +58,7 @@ export default function LandingFooter() {
           </div>
         </div>
 
-        <div className="mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="mt-20 pt-8 border-t border-black/10 flex flex-col md:flex-row justify-between items-center gap-4">
            <p className="text-[10px] font-bold font-space uppercase tracking-widest text-muted-foreground/40">
               © 2024 INTERCEPTAI. NEURAL DEFENSE ACTIVE.
            </p>

@@ -19,6 +19,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useInView } from "react-intersection-observer";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_INTERCEPT_API_BASE_URL || "http://localhost:8000/api/v1";
+
 // Defining the types that correspond to our new backend router
 export interface NewsItem {
   id: string;
@@ -85,14 +87,14 @@ const ArticleCard = ({ item }: { item: NewsItem }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        "glass-card rounded-[1.5rem] border transition-all group relative flex flex-col h-full bg-[#0B0E14] overflow-hidden",
+        "glass-card rounded-[1.5rem] border transition-all group relative flex flex-col h-full bg-card overflow-hidden",
         styles.border,
-        "hover:bg-white/[0.02]"
+        "hover:bg-slate-100"
       )}
     >
       {/* If Image exists */}
       {item.imageUrl && (
-        <div className="h-40 w-full overflow-hidden border-b border-white/5">
+        <div className="h-40 w-full overflow-hidden border-b border-black/10">
           <img 
             src={item.imageUrl} 
             alt={item.title} 
@@ -120,7 +122,7 @@ const ArticleCard = ({ item }: { item: NewsItem }) => {
 
         {/* Main Content */}
         <div className="flex-1 space-y-3">
-          <h2 className="text-lg font-bold font-space tracking-tight leading-snug text-white/90 group-hover:text-white transition-colors line-clamp-3">
+          <h2 className="text-lg font-bold font-space tracking-tight leading-snug text-foreground group-hover:text-foreground transition-colors line-clamp-3">
             {item.title}
           </h2>
           
@@ -130,7 +132,7 @@ const ArticleCard = ({ item }: { item: NewsItem }) => {
         </div>
 
         {/* Footer Link */}
-        <div className="mt-6 pt-4 border-t border-white/5 flex items-center gap-1.5">
+        <div className="mt-6 pt-4 border-t border-black/10 flex items-center gap-1.5">
             <span className={cn(
               "text-[9px] font-bold uppercase tracking-[0.2em] transition-colors",
               styles.text
@@ -159,6 +161,7 @@ export default function NewsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
 
   // InView hook to trigger load more
   const { ref, inView } = useInView({
@@ -166,9 +169,10 @@ export default function NewsPage() {
     rootMargin: "400px",
   });
 
-  const fetchNews = useCallback(async (pageNum: int, isNewSearch: boolean) => {
+  const fetchNews = useCallback(async (pageNum: number, isNewSearch: boolean) => {
     if (loading) return;
     setLoading(true);
+    setError("");
 
     try {
       const params = new URLSearchParams({
@@ -178,8 +182,7 @@ export default function NewsPage() {
       if (filter !== "ALL") params.append("source", filter);
       if (search) params.append("search", search);
 
-      // Using the assumed API endpoint
-      const res = await fetch(`http://localhost:8000/api/v1/news?${params.toString()}`);
+      const res = await fetch(`/api/v1/news?${params.toString()}`);
       
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
@@ -188,7 +191,9 @@ export default function NewsPage() {
       setHasMore(data.hasMore);
       setPage(pageNum);
     } catch (err) {
-      console.error(err);
+      const message = err instanceof Error ? err.message : "Failed to fetch news";
+      setError(message);
+      console.error("News fetch failed:", err);
     } finally {
       setLoading(false);
     }
@@ -237,12 +242,12 @@ export default function NewsPage() {
             placeholder="Search articles..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#0B0E14] border border-white/5 focus:border-primary/50 text-white rounded-xl pl-11 pr-4 py-3 placeholder:text-muted-foreground/50 transition-all font-medium text-sm outline-none"
+            className="w-full bg-card border border-black/10 focus:border-primary/50 text-foreground rounded-xl pl-11 pr-4 py-3 placeholder:text-muted-foreground/50 transition-all font-medium text-sm outline-none"
           />
         </div>
 
         {/* Filters */}
-        <div className="flex items-center space-x-1.5 p-1 bg-[#0B0E14] border border-white/5 rounded-[1rem] overflow-x-auto hide-scrollbar">
+        <div className="flex items-center space-x-1.5 p-1 bg-card border border-black/10 rounded-[1rem] overflow-x-auto hide-scrollbar">
           <div className="pl-3 pr-2 flex items-center text-muted-foreground/50">
             <Filter size={14} />
           </div>
@@ -253,8 +258,8 @@ export default function NewsPage() {
               className={cn(
                 "px-4 py-2.5 rounded-xl text-[10px] font-bold font-space uppercase tracking-widest transition-all whitespace-nowrap",
                 filter === f 
-                  ? "bg-white/10 text-white shadow-lg" 
-                  : "text-muted-foreground hover:bg-white/5 hover:text-white/80"
+                  ? "bg-slate-200 text-foreground shadow-lg" 
+                  : "text-muted-foreground hover:bg-slate-100 hover:text-foreground"
               )}
             >
               {f}
@@ -262,6 +267,12 @@ export default function NewsPage() {
           ))}
         </div>
       </div>
+
+      {error ? (
+        <div className="mb-6 rounded-2xl border border-black/10 bg-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-widest text-error">
+          News feed unavailable: {error}
+        </div>
+      ) : null}
 
       {/* Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-fr">

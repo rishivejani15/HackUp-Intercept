@@ -1,95 +1,89 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { ExternalLink, MoreVertical, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { 
-  ShieldCheck, 
-  ShieldAlert, 
-  ShieldQuestion,
-  MoreVertical,
-  ExternalLink,
-  Info
-} from "lucide-react";
+import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
 
-interface Transaction {
-  id: string;
-  amount: number;
-  riskScore: number;
-  status: "safe" | "suspicious" | "fraud";
-  time: string;
-  merchant: string;
-  topFeature: string;
+interface LiveTransactionRow {
+  id?: string;
+  transaction_id?: string;
+  amount?: number;
+  status?: string;
+  merchant?: string;
+  risk_score?: number;
+  top_feature?: string;
+  time?: string;
+  fraud?: string;
+  userId?: string;
+  user_id?: string;
+  created_at?: string;
+  timestamp?: string;
 }
 
-const mockTransactions: Transaction[] = [
-  {
-    id: "TX-5902",
-    amount: 1240.50,
-    riskScore: 92,
-    status: "fraud",
-    time: "2 mins ago",
-    merchant: "Electronics Hub",
-    topFeature: "Unusual Amount"
-  },
-  {
-    id: "TX-5899",
-    amount: 45.00,
-    riskScore: 12,
-    status: "safe",
-    time: "15 mins ago",
-    merchant: "Daily Brew Coffee",
-    topFeature: "Normal Pattern"
-  },
-  {
-    id: "TX-5894",
-    amount: 890.99,
-    riskScore: 68,
-    status: "suspicious",
-    time: "45 mins ago",
-    merchant: "Luxury Watches Inc",
-    topFeature: "Velocity Alert"
-  },
-  {
-    id: "TX-5882",
-    amount: 15.20,
-    riskScore: 5,
-    status: "safe",
-    time: "1 hour ago",
-    merchant: "City Transit",
-    topFeature: "Verified User"
-  },
-  {
-    id: "TX-5871",
-    amount: 2400.00,
-    riskScore: 88,
-    status: "fraud",
-    time: "3 hours ago",
-    merchant: "Global Resorts",
-    topFeature: "Geo-Shift"
+function toDateText(value: unknown): string {
+  if (!value) return "Live from Firestore";
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+
+  if (typeof value === "object") {
+    const candidate = value as { seconds?: number; nanoseconds?: number; toDate?: () => Date };
+
+    if (typeof candidate.toDate === "function") {
+      return candidate.toDate().toISOString();
+    }
+
+    if (typeof candidate.seconds === "number") {
+      return new Date(candidate.seconds * 1000).toISOString();
+    }
   }
-];
+
+  return String(value);
+}
+
+function toMillis(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === "string") return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+
+  if (typeof value === "object") {
+    const candidate = value as { seconds?: number; toDate?: () => Date };
+    if (typeof candidate.toDate === "function") {
+      return candidate.toDate().getTime();
+    }
+    if (typeof candidate.seconds === "number") {
+      return candidate.seconds * 1000;
+    }
+  }
+
+  return 0;
+}
+
+function normalizeStatus(value: unknown): "safe" | "suspicious" | "fraud" {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "safe" || normalized === "legitimate") return "safe";
+  if (normalized === "suspicious" || normalized === "review") return "suspicious";
+  if (normalized === "fraud" || normalized === "fraudulent") return "fraud";
+  return "suspicious";
+}
 
 export default function TransactionTable() {
-  const [data, setData] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useFirestoreCollection<LiveTransactionRow>("transactions");
 
-  useEffect(() => {
-    // Simulate real data fetching
-    const timer = setTimeout(() => {
-      setData(mockTransactions);
-      setLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+  const rows = [...data].sort((left, right) => {
+    const leftStamp = toMillis(left.created_at || left.timestamp || left.time);
+    const rightStamp = toMillis(right.created_at || right.timestamp || right.time);
+    return rightStamp - leftStamp;
+  });
 
-  if (loading) {
+  if (loading && data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4 animate-glow">
-          <LoaderCircle className="h-6 w-6 animate-spin" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
         <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest animate-pulse">
-            Establishing Secure Stream...
+          Establishing Secure Stream...
         </p>
       </div>
     );
@@ -101,127 +95,95 @@ export default function TransactionTable() {
         <thead>
           <tr className="border-b border-border/50 text-muted-foreground font-outfit uppercase tracking-widest text-[10px] font-bold">
             <th className="px-4 py-4">Transaction ID</th>
-            <th className="px-4 py-4">Status</th>
             <th className="px-4 py-4">Merchant</th>
             <th className="px-4 py-4">Amount</th>
-            <th className="px-4 py-4">Risk Score</th>
-            <th className="px-4 py-4">Primary Factor</th>
+            <th className="px-4 py-4">Fraud</th>
+            <th className="px-4 py-4">Timestamp</th>
+            <th className="px-4 py-4">User ID</th>
             <th className="px-4 py-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/30">
-          {data.map((txn) => (
-            <tr key={txn.id} className="group hover:bg-secondary/20 transition-all duration-200">
-              <td className="px-4 py-4 font-mono text-xs font-bold text-foreground">
-                {txn.id}
-              </td>
-              <td className="px-4 py-4">
-                <StatusBadge status={txn.status} />
-              </td>
-              <td className="px-4 py-4">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{txn.merchant}</p>
-                  <p className="text-xs text-muted-foreground">{txn.time}</p>
-                </div>
-              </td>
-              <td className="px-4 py-4 text-sm font-bold text-foreground">
-                ${txn.amount.toLocaleString()}
-              </td>
-              <td className="px-4 py-4">
-                <RiskBar score={txn.riskScore} />
-              </td>
-              <td className="px-4 py-4">
-                <span className="inline-flex items-center space-x-1 px-2 py-1 rounded-md bg-secondary text-[10px] font-bold text-muted-foreground uppercase border border-border/50">
-                   <Info size={10} className="text-primary" />
-                   <span>{txn.topFeature}</span>
-                </span>
-              </td>
-              <td className="px-4 py-4 text-right">
-                <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors">
-                    <ExternalLink size={16} />
-                  </button>
-                  <button className="p-2 hover:bg-secondary rounded-lg text-muted-foreground transition-colors">
-                    <MoreVertical size={16} />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {rows.map((txn, idx) => {
+            const statusValue = normalizeStatus(txn.status || txn.fraud || "safe");
+            const displayTime = toDateText(txn.time || txn.timestamp || txn.created_at);
+            return (
+              <tr key={`${txn.transaction_id || txn.id || "row"}-${idx}`} className="group hover:bg-secondary/20 transition-all duration-200">
+                <td className="px-4 py-4 font-mono text-xs font-bold text-foreground">
+                  {txn.transaction_id || txn.id || "--"}
+                </td>
+                <td className="px-4 py-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{txn.merchant || "Unknown Merchant"}</p>
+                    <p className="text-xs text-muted-foreground">{displayTime}</p>
+                  </div>
+                </td>
+                <td className="px-4 py-4 text-sm font-bold text-foreground">
+                  ${Number(txn.amount || 0).toLocaleString()}
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge status={statusValue} />
+                </td>
+                <td className="px-4 py-4">
+                  <span className="text-xs text-muted-foreground">{displayTime}</span>
+                </td>
+                <td className="px-4 py-4">
+                  <span className="inline-flex items-center space-x-1 px-2 py-1 rounded-md bg-secondary text-[10px] font-bold text-muted-foreground uppercase border border-border/50">
+                    <Info size={10} className="text-primary" />
+                    <span>{(txn as any).userId || (txn as any).user_id || "banker-simulator"}</span>
+                  </span>
+                </td>
+                <td className="px-4 py-4 text-right">
+                  <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors">
+                      <ExternalLink size={16} />
+                    </button>
+                    <button className="p-2 hover:bg-secondary rounded-lg text-muted-foreground transition-colors">
+                      <MoreVertical size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: Transaction["status"] }) {
-  const configs = {
-    safe: {
-      label: "Safe",
-      icon: ShieldCheck,
-      classes: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-    },
-    suspicious: {
-      label: "Review",
-      icon: ShieldQuestion,
-      classes: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-    },
-    fraud: {
-      label: "Fraud",
-      icon: ShieldAlert,
-      classes: "text-destructive bg-destructive/10 border-destructive/20",
-    },
-  };
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const config =
+    normalized === "safe"
+      ? {
+          label: "Safe",
+          icon: ShieldCheck,
+          classes: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+        }
+      : normalized === "suspicious"
+      ? {
+          label: "Review",
+          icon: ShieldQuestion,
+          classes: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+        }
+      : {
+          label: "Fraud",
+          icon: ShieldAlert,
+          classes: "text-destructive bg-destructive/10 border-destructive/20",
+        };
 
-  const config = configs[status];
   const Icon = config.icon;
 
   return (
-    <span className={cn(
-      "inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
-      config.classes
-    )}>
+    <span
+      className={cn(
+        "inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+        config.classes
+      )}
+    >
       <Icon size={12} className="animate-pulse" />
       <span>{config.label}</span>
     </span>
-  );
-}
-
-function RiskBar({ score }: { score: number }) {
-  let colorClass = "bg-emerald-500";
-  if (score > 40) colorClass = "bg-amber-500";
-  if (score > 75) colorClass = "bg-destructive";
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[10px] font-bold">
-        <span className="text-foreground">{score}%</span>
-      </div>
-      <div className="h-1 w-24 bg-border/50 rounded-full overflow-hidden">
-        <div 
-          className={cn("h-full rounded-full animate-glow", colorClass)} 
-          style={{ width: `${score}%` }} 
-        />
-      </div>
-    </div>
-  );
-}
-
-function LoaderCircle(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }

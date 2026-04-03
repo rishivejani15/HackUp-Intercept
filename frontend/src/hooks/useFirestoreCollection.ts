@@ -28,7 +28,7 @@ export function useFirestoreCollection<T = DocumentData>(
         (snapshot) => {
           const items: T[] = [];
           snapshot.forEach((doc) => {
-            items.push({ id: doc.id, ...doc.data() } as T);
+            items.push({ ...(doc.data() as object), id: doc.id, _docId: doc.id } as T);
           });
           setData(items);
           setLoading(false);

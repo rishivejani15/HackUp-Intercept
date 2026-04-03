@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { 
   User, 
@@ -8,7 +9,6 @@ import {
   Shield, 
   Bell, 
   Key, 
-  ExternalLink, 
   Cpu, 
   CheckCircle,
   Copy,
@@ -16,11 +16,33 @@ import {
   Save
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
+
+type KeyMetadataResponse = {
+   masked_key: string;
+   created_at: string;
+   active: boolean;
+};
+
+type IssueKeyResponse = {
+   created: boolean;
+   api_key: string | null;
+   metadata: KeyMetadataResponse;
+   message: string;
+};
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_INTERCEPT_API_BASE_URL || "http://localhost:8000/api/v1";
+const LOCAL_KEY_CACHE = "intercept_simulator_api_key";
 
 export default function SettingsPage() {
+   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [threshold, setThreshold] = useState(85);
+   const [keyMetadata, setKeyMetadata] = useState<KeyMetadataResponse | null>(null);
+   const [issuedKey, setIssuedKey] = useState<string>("");
+   const [keyLoading, setKeyLoading] = useState(false);
+   const [keyIssuing, setKeyIssuing] = useState(false);
+   const [keyMessage, setKeyMessage] = useState("");
 
   const tabs = [
     { id: "profile", label: "User Profile", icon: User },
@@ -28,6 +50,131 @@ export default function SettingsPage() {
     { id: "security", label: "Security & Keys", icon: Key },
     { id: "notifications", label: "Intelligence Alerts", icon: Bell },
   ];
+
+   const getIdToken = useCallback(async () => {
+      if (!user) {
+         throw new Error("Authentication required");
+      }
+      return user.getIdToken();
+   }, [user]);
+
+   const loadKeyMetadata = useCallback(async () => {
+      if (!user) return;
+      setKeyLoading(true);
+      setKeyMessage("");
+
+      try {
+         const token = await getIdToken();
+         const response = await fetch(`${API_BASE_URL}/keys/me`, {
+            method: "GET",
+            headers: {
+               Authorization: `Bearer ${token}`,
+            },
+         });
+
+         if (!response.ok) {
+            throw new Error("Failed to fetch API key metadata");
+         }
+
+         const data: KeyMetadataResponse = await response.json();
+         if (data.active) {
+            setKeyMetadata(data);
+         } else {
+            setKeyMetadata(null);
+         }
+      } catch {
+         setKeyMessage("Unable to load API key details right now.");
+      } finally {
+         setKeyLoading(false);
+      }
+   }, [getIdToken, user]);
+
+   useEffect(() => {
+      if (activeTab === "security") {
+         loadKeyMetadata();
+      }
+   }, [activeTab, loadKeyMetadata]);
+
+   const handleIssueKey = async () => {
+      if (!user || keyIssuing) return;
+      setKeyIssuing(true);
+      setKeyMessage("");
+
+      try {
+         const token = await getIdToken();
+         const response = await fetch(`${API_BASE_URL}/keys/issue`, {
+            method: "POST",
+            headers: {
+               Authorization: `Bearer ${token}`,
+            },
+         });
+
+         if (!response.ok) {
+            throw new Error("Failed to issue API key");
+         }
+
+         const data: IssueKeyResponse = await response.json();
+         setKeyMetadata(data.metadata);
+         setKeyMessage(data.message);
+
+         if (data.api_key) {
+            setIssuedKey(data.api_key);
+            window.localStorage.setItem(LOCAL_KEY_CACHE, data.api_key);
+         }
+      } catch {
+         setKeyMessage("Unable to issue API key. Please try again.");
+      } finally {
+         setKeyIssuing(false);
+      }
+   };
+
+   const handleRegenerateKey = async () => {
+      if (!user || keyIssuing) return;
+
+      const confirmed = window.confirm(
+         "Regenerate API key? Your previous key will stop working immediately."
+      );
+      if (!confirmed) return;
+
+      setKeyIssuing(true);
+      setKeyMessage("");
+
+      try {
+         const token = await getIdToken();
+         const response = await fetch(`${API_BASE_URL}/keys/regenerate`, {
+            method: "POST",
+            headers: {
+               Authorization: `Bearer ${token}`,
+            },
+         });
+
+         if (!response.ok) {
+            throw new Error("Failed to regenerate API key");
+         }
+
+         const data: IssueKeyResponse = await response.json();
+         setKeyMetadata(data.metadata);
+         setKeyMessage(data.message);
+
+         if (data.api_key) {
+            setIssuedKey(data.api_key);
+            window.localStorage.setItem(LOCAL_KEY_CACHE, data.api_key);
+         }
+      } catch {
+         setKeyMessage("Unable to regenerate API key. Please try again.");
+      } finally {
+         setKeyIssuing(false);
+      }
+   };
+
+   const handleCopy = async (value: string, successMessage: string) => {
+      try {
+         await navigator.clipboard.writeText(value);
+         setKeyMessage(successMessage);
+      } catch {
+         setKeyMessage("Copy failed. Please copy manually.");
+      }
+   };
 
   return (
     <DashboardLayout>
@@ -64,7 +211,7 @@ export default function SettingsPage() {
                      "relative flex items-center px-4 py-4 text-[10px] font-bold font-space uppercase tracking-widest rounded-xl transition-all duration-300",
                      activeTab === tab.id 
                        ? "bg-primary/10 text-primary border border-primary/20 shadow-lg shadow-primary/5" 
-                       : "text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
+                       : "text-muted-foreground hover:bg-slate-100 hover:text-foreground border border-transparent"
                   )}
                >
                   <tab.icon size={16} className="mr-3" />
@@ -78,15 +225,15 @@ export default function SettingsPage() {
 
          {/* Content Area */}
          <div className="flex-1">
-            <div className="glass-card rounded-[2.5rem] p-10 border border-white/5 min-h-[600px] relative overflow-hidden">
+            <div className="glass-card rounded-[2.5rem] p-10 border border-black/10 min-h-[600px] relative overflow-hidden">
                {activeTab === "profile" && (
                  <div className="space-y-10 animate-in fade-in duration-500">
-                    <div className="flex items-center space-x-8 pb-10 border-b border-white/5">
+                    <div className="flex items-center space-x-8 pb-10 border-b border-black/10">
                         <div className="relative group">
                            <div className="h-32 w-32 rounded-3xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center group-hover:scale-105 transition-transform duration-500 overflow-hidden">
                               <User size={64} className="text-primary/40" />
                               <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                 <span className="text-[10px] font-bold text-white uppercase tracking-widest">Update Avatar</span>
+                                 <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Update Avatar</span>
                               </div>
                            </div>
                            <div className="absolute -bottom-2 -right-2 h-8 w-8 rounded-xl bg-secondary flex items-center justify-center text-white border-4 border-background shadow-lg">
@@ -97,7 +244,7 @@ export default function SettingsPage() {
                            <h3 className="text-2xl font-bold font-space tracking-tight text-foreground">Analyst-01 Internal</h3>
                            <p className="text-xs font-bold text-primary/60 uppercase tracking-widest mt-1">Sr. Technical Forensic Investigator</p>
                            <div className="flex items-center space-x-2 mt-4">
-                              <div className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-mono text-muted-foreground flex items-center space-x-2">
+                              <div className="px-2 py-1 rounded bg-slate-100 border border-black/15 text-[9px] font-mono text-muted-foreground flex items-center space-x-2">
                                  <Zap size={10} className="text-primary" />
                                  <span>SESSION ACTIVE: 4H 12M</span>
                               </div>
@@ -111,7 +258,7 @@ export default function SettingsPage() {
                           <input 
                              type="text" 
                              defaultValue="Samyak G"
-                             className="h-12 w-full rounded-xl bg-white/[0.03] border border-white/5 px-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20"
+                             className="h-12 w-full rounded-xl bg-slate-100 border border-black/10 px-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20"
                           />
                        </div>
                        <div className="space-y-4">
@@ -119,7 +266,7 @@ export default function SettingsPage() {
                           <input 
                              type="email" 
                              defaultValue="analyst-01@interceptai.io"
-                             className="h-12 w-full rounded-xl bg-white/[0.03] border border-white/5 px-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20"
+                             className="h-12 w-full rounded-xl bg-slate-100 border border-black/10 px-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20"
                           />
                        </div>
                        <div className="space-y-4 md:col-span-2">
@@ -127,7 +274,7 @@ export default function SettingsPage() {
                           <textarea 
                              rows={4}
                              defaultValue="Lead forensic architect focusing on real-time P2P behavioral anomalies and automated bot detection."
-                             className="w-full rounded-2xl bg-white/[0.03] border border-white/5 p-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none"
+                             className="w-full rounded-2xl bg-slate-100 border border-black/10 p-4 text-xs font-space font-bold uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none"
                           />
                        </div>
                     </div>
@@ -153,7 +300,7 @@ export default function SettingsPage() {
                              max="100" 
                              value={threshold}
                              onChange={(e) => setThreshold(parseInt(e.target.value))}
-                             className="w-full h-1 bg-white/5 rounded-full appearance-none cursor-pointer accent-primary"
+                             className="w-full h-1 bg-slate-100 rounded-full appearance-none cursor-pointer accent-primary"
                           />
                           <div className="flex justify-between text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest px-1">
                              <span>Relaxed (High Passive)</span>
@@ -162,8 +309,8 @@ export default function SettingsPage() {
                           </div>
                        </div>
 
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
-                          <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center space-x-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-black/10">
+                          <div className="p-6 rounded-2xl bg-slate-100 border border-black/10 flex items-center space-x-6">
                              <div className="h-12 w-12 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
                                 <Shield size={24} />
                              </div>
@@ -177,7 +324,7 @@ export default function SettingsPage() {
                                 </div>
                              </div>
                           </div>
-                          <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center space-x-6">
+                          <div className="p-6 rounded-2xl bg-slate-100 border border-black/10 flex items-center space-x-6">
                              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                                 <Cpu size={24} />
                              </div>
@@ -186,7 +333,7 @@ export default function SettingsPage() {
                                 <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Run experimental model in background</p>
                              </div>
                              <div className="ml-auto">
-                                <div className="h-6 w-11 rounded-full bg-white/10 relative cursor-pointer">
+                                <div className="h-6 w-11 rounded-full bg-slate-200 relative cursor-pointer">
                                    <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-muted-foreground transition-all" />
                                 </div>
                              </div>
@@ -200,34 +347,100 @@ export default function SettingsPage() {
                  <div className="space-y-10 animate-in fade-in duration-500">
                     <div>
                        <h3 className="text-xl font-bold font-space uppercase tracking-widest text-foreground">Intelligence API Protocols</h3>
-                       <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-1">Manage core encryption keys and service credentials</p>
+                                  <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-1">One persistent key per user for simulator and external fraud checks</p>
                     </div>
 
                     <div className="space-y-6">
-                       <div className="glass p-6 rounded-2xl border border-white/5 space-y-4">
+                       <div className="glass p-6 rounded-2xl border border-black/10 space-y-4">
                           <div className="flex items-center justify-between">
                              <div className="flex items-center space-x-3">
                                 <Key size={16} className="text-primary/60" />
-                                <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Main Production Key (v2)</span>
+                                                <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Persistent User Key</span>
                              </div>
-                             <span className="text-[9px] font-bold text-secondary uppercase tracking-[0.2em] animate-pulse">Live / Active</span>
+                                           <span className={cn(
+                                              "text-[9px] font-bold uppercase tracking-[0.2em]",
+                                              keyMetadata?.active ? "text-secondary animate-pulse" : "text-muted-foreground"
+                                           )}>
+                                              {keyMetadata?.active ? "Live / Active" : "Not Issued"}
+                                           </span>
                           </div>
-                          <div className="relative">
-                             <input 
-                                type="password" 
-                                readOnly
-                                value="sh-fs-8291-x992-neural-alpha-001"
-                                className="h-12 w-full rounded-xl bg-black px-4 text-xs font-mono font-bold text-primary tracking-widest"
-                             />
-                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-2">
-                                <button className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white"><Copy size={14} /></button>
-                             </div>
-                          </div>
+
+                                       {issuedKey ? (
+                                          <div className="space-y-3">
+                                             <p className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Copy and store this key now. It is shown once.</p>
+                                             <div className="relative">
+                                                 <input 
+                                                      type="text" 
+                                                      readOnly
+                                                      value={issuedKey}
+                                                      className="h-12 w-full rounded-xl bg-slate-100 px-4 text-xs font-mono font-bold text-primary tracking-widest"
+                                                 />
+                                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+                                                      <button
+                                                         onClick={() => handleCopy(issuedKey, "Key copied.")}
+                                                         className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                                      >
+                                                         <Copy size={14} />
+                                                      </button>
+                                                 </div>
+                                             </div>
+                                          </div>
+                                       ) : (
+                                          <div className="relative">
+                                              <input 
+                                                   type="text" 
+                                                   readOnly
+                                                   value={keyMetadata?.masked_key || "No key provisioned yet"}
+                                                   className="h-12 w-full rounded-xl bg-slate-100 px-4 text-xs font-mono font-bold text-primary tracking-widest"
+                                              />
+                                              {keyMetadata?.masked_key ? (
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+                                                   <button
+                                                      onClick={() => handleCopy(keyMetadata.masked_key, "Masked key copied.")}
+                                                      className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                                   >
+                                                      <Copy size={14} />
+                                                   </button>
+                                                </div>
+                                              ) : null}
+                                          </div>
+                                       )}
+
+                                       {keyMetadata?.created_at ? (
+                                          <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
+                                             Issued At: {new Date(keyMetadata.created_at).toLocaleString()}
+                                          </p>
+                                       ) : null}
+
+                                       {keyMessage ? (
+                                          <p className="text-[10px] text-primary font-bold uppercase tracking-widest">{keyMessage}</p>
+                                       ) : null}
                        </div>
 
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <button className="h-14 rounded-2xl border border-white/5 bg-white/[0.02] text-[10px] font-bold font-space uppercase tracking-widest hover:bg-white/5 transition-all">Rotate All Keys</button>
-                          <button className="h-14 rounded-2xl border border-white/5 bg-white/[0.02] text-[10px] font-bold font-space uppercase tracking-widest hover:bg-white/5 transition-all text-error">Revoke Access</button>
+                                       <button
+                                          onClick={handleIssueKey}
+                                          disabled={keyIssuing || keyLoading || !!keyMetadata}
+                                          className="h-14 rounded-2xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest hover:bg-slate-100 transition-all disabled:opacity-50"
+                                       >
+                                          {keyIssuing ? "Issuing Key..." : keyMetadata ? "Key Already Provisioned" : "Issue Persistent Key"}
+                                       </button>
+                                       <button
+                                          onClick={handleRegenerateKey}
+                                          disabled={keyIssuing || keyLoading || !keyMetadata}
+                                          className="h-14 rounded-2xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest hover:bg-slate-100 transition-all text-error disabled:opacity-50"
+                                       >
+                                          Regenerate Key
+                                       </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                       <Link
+                                          href="/test-simulator"
+                                          className="h-14 rounded-2xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest hover:bg-slate-100 transition-all text-primary flex items-center justify-center"
+                                       >
+                                          Open Simulator Test Page
+                                       </Link>
                        </div>
                     </div>
                  </div>
