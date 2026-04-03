@@ -1,0 +1,56 @@
+POST /transaction/evaluate
+Sends one transaction for live scoring. It returns txn_risk, synthetic_score, confidence, final_score, decision, fired signals, explanation text, and latency. Use this when you want to test a single transaction payload.
+
+GET /transactions
+Returns the in-memory cache of scored transactions, paginated by the limit query param. Supports sort values risk_desc, risk_asc, and amount_desc, plus optional filter_decision such as APPROVE, MFA_REQUIRED, or BLOCK.
+
+GET /transactions/{id}/detail
+Returns the full record for one cached transaction by its id. Use this when you already have the transaction id from /transactions.
+
+GET /model-stats
+Returns summary metrics from startup scoring, including total transactions, fraud counts, decision breakdown, top fraud branches, and average risk scores.
+
+GET /fraud-rings
+Returns connected groups of transactions that share patterns such as the same destination, same oldbalanceDest, or similar branch-plus-amount behavior.
+
+GET /accounts/{nameOrig}/timeline
+Returns a transaction timeline for one origin account. It lists step, date, type, amount, balances before and after, destination, whether the event was anomalous, and the decision.
+
+GET /alerts
+Returns BLOCK decisions as alert objects, sorted by synthetic score descending. Useful for a SOC-style alert feed.
+
+GET /health
+Returns a simple service health check and whether the dataset cache loaded.
+
+
+
+{
+"step": 88,
+"type": "PAYMENT",
+"branch": "Canada",
+"amount": 4200.00,
+"nameOrig": "C44556677",
+"oldbalanceOrg": 9000.00,
+"newbalanceOrig": 4800.00,
+"nameDest": "M55667788",
+"oldbalanceDest": 0.0,
+"newbalanceDest": 0.0,
+"unusuallogin": 1,
+"Acct type": "Checking",
+"Time of day": "Evening",
+"Date of transaction": "2026-04-04"
+}
+
+
+
+
+{
+    "txn_risk": 8.0,
+    "synthetic_score": 0.0,
+    "confidence": "HIGH",
+    "final_score": 5.6,
+    "decision": "APPROVE",
+    "signals": {},
+    "human_explanation": [],
+    "latency_ms": 0.07
+}

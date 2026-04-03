@@ -1,0 +1,210 @@
+http://127.0.0.1:8000/transactions
+
+http://127.0.0.1:8000/explain - 
+
+{
+  "meta": {
+    "transaction_id": "test_blatant_fraud",
+    "amount": 4500.00,
+    "user_avg_amount": 45.00,
+    "merchant_city": "Moscow",
+    "merchant_state": "RU",
+    "user_state": "CA",
+    "mcc_description": "Cryptocurrency Exchange",
+    "hour": 3,
+    "minute": 15,
+    "seconds_gap": 15 
+  },
+  "features": {
+    "hour_of_day": 3.0,
+    "day_of_week": 6.0,
+    "is_weekend": 1.0,
+    "is_night": 1.0,
+    "month": 12.0,
+    "is_month_end": 0.0,
+    "quarter": 4.0,
+    "log_amount": 8.4,
+    "amount_vs_credit_limit_ratio": 0.95,
+    "amount_is_round": 1.0,
+    "amount_decile": 9.0,
+    "user_avg_amount_7d": 45.0,
+    "user_std_amount_7d": 10.0,
+    "user_txn_count_24h": 12.0,
+    "amount_vs_user_avg_ratio": 100.0,
+    "amount_zscore_user": 4.5,
+    "seconds_since_last_txn": 15.0,
+    "txns_last_1h": 5.0,
+    "is_rapid_succession": 1.0,
+    "card_age_days": 10.0,
+    "credit_utilization": 0.98,
+    "days_since_pin_change": 1.0,
+    "card_on_dark_web": 1.0,
+    "has_chip": 0.0,
+    "card_type_encoded": 0.0,
+    "num_cards_issued": 1.0,
+    "debt_to_income_ratio": 0.8,
+    "credit_score": 520.0,
+    "current_age": 22.0,
+    "num_credit_cards": 4.0,
+    "mcc_description_encoded": 15.0,
+    "is_high_risk_mcc": 1.0,
+    "merchant_in_new_city": 1.0,
+    "is_foreign_transaction": 1.0,
+    "merchant_state_encoded": 50.0
+  }
+}
+
+
+output - 
+
+{
+    "status": "success",
+    "latency_ms": 7.81,
+    "data": {
+        "transaction_id": "test_blatant_fraud",
+        "risk_score": 100.0,
+        "fraud_probability": 0.999923,
+        "classification": "fraud",
+        "shap_explanation": {
+            "base_value": 0.010596594657168203,
+            "output_value": 0.999923162626216,
+            "top_features": [
+                {
+                    "feature_name": "credit_utilization",
+                    "human_label": "Credit Utilization",
+                    "feature_value": 0.98,
+                    "shap_value": 0.479849,
+                    "direction": "increases_fraud",
+                    "contribution_percent": 48.5,
+                    "severity": "CRITICAL",
+                    "human_explanation": "Transaction uses 98% of the card's credit limit",
+                    "icon": "💳"
+                },
+                {
+                    "feature_name": "amount_zscore_user",
+                    "human_label": "Amount Z-Score (User)",
+                    "feature_value": 4.5,
+                    "shap_value": 0.136515,
+                    "direction": "increases_fraud",
+                    "contribution_percent": 13.8,
+                    "severity": "HIGH",
+                    "human_explanation": "Amount is 4.5 standard deviations above this user's average",
+                    "icon": "📊"
+                },
+                {
+                    "feature_name": "amount_vs_user_avg_ratio",
+                    "human_label": "Amount vs User Average",
+                    "feature_value": 100.0,
+                    "shap_value": 0.132364,
+                    "direction": "increases_fraud",
+                    "contribution_percent": 13.4,
+                    "severity": "HIGH",
+                    "human_explanation": "Amount ($4,500.00) is 100.0x this user's average ($45.00)",
+                    "icon": "💸"
+                },
+                {
+                    "feature_name": "txns_last_1h",
+                    "human_label": "Transactions in Last Hour",
+                    "feature_value": 5.0,
+                    "shap_value": 0.09764,
+                    "direction": "increases_fraud",
+                    "contribution_percent": 9.9,
+                    "severity": "MEDIUM",
+                    "human_explanation": "5 transactions in the past hour — elevated frequency",
+                    "icon": "⚡"
+                },
+                {
+                    "feature_name": "seconds_since_last_txn",
+                    "human_label": "Time Since Last Transaction",
+                    "feature_value": 15.0,
+                    "shap_value": 0.093426,
+                    "direction": "increases_fraud",
+                    "contribution_percent": 9.4,
+                    "severity": "MEDIUM",
+                    "human_explanation": "Feature 'seconds_since_last_txn' shows 9.3% deviation from expected baseline",
+                    "icon": "⏱️"
+                }
+            ],
+            "waterfall": {
+                "base_value": 0.010597,
+                "output_value": 0.999923,
+                "steps": [
+                    {
+                        "feature": "credit_utilization",
+                        "human_label": "Credit Utilization",
+                        "shap_value": 0.479849,
+                        "feature_value": 0.98,
+                        "cumulative": 0.490445
+                    },
+                    {
+                        "feature": "amount_zscore_user",
+                        "human_label": "Amount Z-Score (User)",
+                        "shap_value": 0.136515,
+                        "feature_value": 4.5,
+                        "cumulative": 0.626961
+                    },
+                    {
+                        "feature": "amount_vs_user_avg_ratio",
+                        "human_label": "Amount vs User Average",
+                        "shap_value": 0.132364,
+                        "feature_value": 100.0,
+                        "cumulative": 0.759325
+                    },
+                    {
+                        "feature": "txns_last_1h",
+                        "human_label": "Transactions in Last Hour",
+                        "shap_value": 0.09764,
+                        "feature_value": 5.0,
+                        "cumulative": 0.856965
+                    },
+                    {
+                        "feature": "seconds_since_last_txn",
+                        "human_label": "Time Since Last Transaction",
+                        "shap_value": 0.093426,
+                        "feature_value": 15.0,
+                        "cumulative": 0.950391
+                    }
+                ],
+                "remainder": 0.049532,
+                "additivity_check_passed": true
+            }
+        },
+        "human_explanation": {
+            "headline": "🚨 HIGH FRAUD RISK — 3 risk factors found",
+            "summary": "Fraud probability: 100.0%. Primary signals: Transaction uses 98% of the card's credit limit; Amount is 4.5 standard deviations above this user's average.",
+            "factors": [
+                {
+                    "severity": "CRITICAL",
+                    "icon": "🚨",
+                    "text": "Transaction uses 98% of the card's credit limit",
+                    "feature": "credit_utilization"
+                },
+                {
+                    "severity": "HIGH",
+                    "icon": "⚠️",
+                    "text": "Amount is 4.5 standard deviations above this user's average",
+                    "feature": "amount_zscore_user"
+                },
+                {
+                    "severity": "HIGH",
+                    "icon": "⚠️",
+                    "text": "Amount ($4,500.00) is 100.0x this user's average ($45.00)",
+                    "feature": "amount_vs_user_avg_ratio"
+                },
+                {
+                    "severity": "MEDIUM",
+                    "icon": "📌",
+                    "text": "5 transactions in the past hour — elevated frequency",
+                    "feature": "txns_last_1h"
+                },
+                {
+                    "severity": "MEDIUM",
+                    "icon": "📌",
+                    "text": "Feature 'seconds_since_last_txn' shows 9.3% deviation from expected baseline",
+                    "feature": "seconds_since_last_txn"
+                }
+            ],
+            "compliance_note": "Explanation generated per GDPR Article 22 requirements for automated decision-making transparency."
+        }
+    }
+}
