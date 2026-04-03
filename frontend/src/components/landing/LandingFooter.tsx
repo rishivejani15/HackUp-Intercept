@@ -7,7 +7,7 @@ import { Shield } from "lucide-react";
 export default function LandingFooter() {
   return (
     <footer className="py-20 border-t border-white/5 relative z-10">
-      <div className="container mx-auto px-6">
+      <div className="max-w-[1400px] mx-auto px-10 md:px-16 lg:px-24">
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1 space-y-6">
             <Link href="/" className="flex items-center space-x-2">

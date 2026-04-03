@@ -47,9 +47,9 @@ const RiskGauge = ({ value, label }: { value: number, label: string }) => (
        </svg>
        <span className="text-[10px] font-bold font-space text-white">{value}%</span>
     </div>
-    <div className="flex flex-col">
+    <div>
        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</div>
-       <div className="text-[10px] font-bold text-white uppercase opacity-80">Synced</div>
+       <div className="text-xs font-bold text-white uppercase">System Balanced</div>
     </div>
   </div>
 );
@@ -79,33 +79,23 @@ const CapitalFlow = () => (
   </div>
 );
 
-const TelemetryFeed = () => {
-   const [mounted, setMounted] = React.useState(false);
-   
-   React.useEffect(() => {
-     setMounted(true);
-   }, []);
-
-   if (!mounted) return <div className="animate-pulse bg-white/5 h-20 rounded-xl" />;
-
-   return (
-      <div className="space-y-2 font-mono text-[9px] text-muted-foreground">
-         {[1,2,3,4].map(i => (
-           <div key={i} className="flex items-center space-x-2 border-b border-white/5 pb-1 last:border-0 opacity-80">
-             <span className="text-secondary font-bold">[{new Date().toLocaleTimeString().split(' ')[0]}]</span>
-             <span>SIG_DETECTED: AUTH_{i}</span>
-             <span className="ml-auto text-primary">0.0{i}ms</span>
-           </div>
-         ))}
-      </div>
-   );
-};
+const TelemetryFeed = () => (
+   <div className="space-y-2 font-mono text-[9px] text-muted-foreground">
+      {[1,2,3,4].map(i => (
+        <div key={i} className="flex items-center space-x-2 border-b border-white/5 pb-1 last:border-0 opacity-80">
+          <span className="text-secondary font-bold">[{new Date().toLocaleTimeString().split(' ')[0]}]</span>
+          <span>SIG_DETECTED: AUTH_LAYER_{i}</span>
+          <span className="ml-auto text-primary">0.0{i}ms</span>
+        </div>
+      ))}
+   </div>
+);
 
 // --- Main Hero ---
 
 export default function Hero() {
   return (
-    <section className="relative min-h-[95vh] flex items-center justify-center overflow-hidden pt-12 pb-20">
+    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden pt-12 pb-20">
       {/* Background Grids */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 grid-subtle opacity-20" />
@@ -134,7 +124,7 @@ export default function Hero() {
             </h1>
 
             <p className="max-w-2xl mx-auto text-lg text-muted-foreground font-medium leading-relaxed">
-              Autonomous financial intelligence built to neutralize cross-border threats at the speed of capital flow.
+              Autonomous financial intelligence built to neutralize cross-border threats at the speed of capital.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -148,7 +138,7 @@ export default function Hero() {
               
               <button className="h-16 px-10 rounded-2xl glass border border-white/10 text-foreground text-[10px] font-bold font-space uppercase tracking-[0.3em] hover:bg-white/5 transition-all flex items-center justify-center space-x-3 group">
                 <Play size={16} className="fill-current" />
-                <span>Watch Analysis Demo</span>
+                <span>Watch Analysis demo</span>
               </button>
             </div>
           </motion.div>
@@ -159,12 +149,12 @@ export default function Hero() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4, duration: 1 }}
-          className="w-full max-w-6xl h-auto relative p-2"
+          className="w-full max-w-6xl h-[500px] relative p-2"
         >
-          <div className="w-full glass rounded-[3rem] p-8 border border-white/5 grid grid-cols-1 md:grid-cols-12 gap-4 relative overflow-hidden">
+          <div className="h-full w-full glass rounded-[3rem] p-8 border border-white/5 grid grid-cols-12 grid-rows-6 gap-4 relative overflow-hidden">
              
              {/* Central Focal Point (Neural Orb) */}
-             <div className="md:col-span-12 lg:col-span-6 flex items-center justify-center py-10 relative">
+             <div className="col-span-12 row-span-4 lg:col-span-6 lg:row-span-6 flex items-center justify-center relative">
                 <div className="absolute inset-0 bg-primary/5 rounded-full blur-[100px] " />
                 
                 {/* Orbital Rings */}
@@ -174,7 +164,7 @@ export default function Hero() {
                 {/* Core Orb */}
                 <div className="relative h-40 w-40 rounded-full bg-gradient-to-br from-primary via-secondary to-primary p-[1px] animate-pulse">
                   <div className="h-full w-full rounded-full bg-background flex items-center justify-center overflow-hidden">
-                    <div className="absolute inset-0 bg-primary/10" />
+                    <div className="absolute inset-0 bg-primary/10 animate-pulse" />
                     <Cpu size={60} className="text-primary/40 animate-pulse" />
                     
                     {/* Inner Signal Stream */}
@@ -190,16 +180,16 @@ export default function Hero() {
              </div>
 
              {/* Side Compartments */}
-             <div className="md:col-span-6 lg:col-span-3">
+             <div className="col-span-12 row-span-2 lg:col-span-3 lg:row-span-3">
                 <Compartment title="Market Threat Intelligence">
-                   <div className="space-y-6 mt-4">
+                   <div className="space-y-6 mt-2">
                       <RiskGauge value={98.4} label="Interception" />
                       <RiskGauge value={12.5} label="Risk Velocity" />
                    </div>
                 </Compartment>
              </div>
 
-             <div className="md:col-span-6 lg:col-span-3">
+             <div className="col-span-12 row-span-2 lg:col-span-3 lg:row-span-3">
                 <Compartment title="Capital Flow Stream">
                    <div className="mt-4">
                       <CapitalFlow />
@@ -207,24 +197,24 @@ export default function Hero() {
                 </Compartment>
              </div>
 
-             <div className="md:col-span-6 lg:col-span-3">
+             <div className="col-span-12 row-span-2 lg:col-span-3 lg:row-span-3 lg:mt-0">
                 <Compartment title="Neural Telemetry">
-                   <div className="mt-4 h-full min-h-[120px]">
+                   <div className="mt-2">
                       <TelemetryFeed />
                    </div>
                 </Compartment>
              </div>
 
-             <div className="md:col-span-6 lg:col-span-3">
+             <div className="col-span-12 row-span-2 lg:col-span-3 lg:row-span-3 lg:mt-0">
                 <Compartment title="Shield Protocol">
-                   <div className="mt-4 space-y-4">
+                   <div className="mt-4 space-y-3">
                       {[
                         { label: "Neural Fingerprint", active: true },
                         { label: "Geo-Spatial Sync", active: true },
                         { label: "Capital Vault Alpha", active: false },
                       ].map((item, i) => (
                         <div key={i} className="flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest">
-                           <div className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-secondary animate-pulse" : "bg-white/10")} />
+                           <div className={cn("h-2 w-2 rounded-full", item.active ? "bg-secondary animate-pulse" : "bg-white/10")} />
                            <span className={item.active ? "text-white" : "text-muted-foreground"}>{item.label}</span>
                         </div>
                       ))}

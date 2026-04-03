@@ -1,88 +1,296 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { Newspaper, Shield, Search, Filter, AlertTriangle, Zap, Globe, Share2, ExternalLink } from "lucide-react";
-import { motion } from "framer-motion";
+import { 
+  Globe, 
+  Share2, 
+  ExternalLink, 
+  Shield, 
+  Search, 
+  Filter, 
+  CheckCircle2, 
+  Clock, 
+  Zap, 
+  AlertTriangle,
+  Loader2
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { useInView } from "react-intersection-observer";
+
+// Defining the types that correspond to our new backend router
+export interface NewsItem {
+  id: string;
+  title: string;
+  description: string;
+  link: string;
+  source: "THE HACKER NEWS" | "KREBS ON SECURITY" | "BLEEPINGCOMPUTER" | "SECURITYWEEK" | "DARK READING" | string;
+  publishedAt: string;
+  imageUrl?: string;
+  timeAgo: string;
+}
+
+// Map each specific source to a brand color strategy
+const SOURCE_STYLES: Record<string, { brand: string, text: string, bg: string, border: string }> = {
+  "THE HACKER NEWS": {
+    brand: "text-[#00ff00]",
+    text: "text-[#00ff00]",
+    bg: "bg-[#00ff00]/10",
+    border: "border-[#00ff00]/20"
+  },
+  "KREBS ON SECURITY": {
+    brand: "text-[#00f0ff]",
+    text: "text-[#00f0ff]",
+    bg: "bg-[#00f0ff]/10",
+    border: "border-[#00f0ff]/20"
+  },
+  "BLEEPINGCOMPUTER": {
+    brand: "text-[#b200ff]",
+    text: "text-[#b200ff]",
+    bg: "bg-[#b200ff]/10",
+    border: "border-[#b200ff]/20"
+  },
+  "SECURITYWEEK": {
+    brand: "text-[#ffaa00]",
+    text: "text-[#ffaa00]",
+    bg: "bg-[#ffaa00]/10",
+    border: "border-[#ffaa00]/20"
+  },
+  "DARK READING": {
+    brand: "text-[#ff0055]",
+    text: "text-[#ff0055]",
+    bg: "bg-[#ff0055]/10",
+    border: "border-[#ff0055]/20"
+  }
+};
+
+const DEFAULT_STYLE = {
+  brand: "text-primary",
+  text: "text-primary",
+  bg: "bg-primary/10",
+  border: "border-primary/20"
+};
+
+const ArticleCard = ({ item }: { item: NewsItem }) => {
+  const styles = SOURCE_STYLES[item.source] || DEFAULT_STYLE;
+
+  return (
+    <motion.a
+      href={item.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className={cn(
+        "glass-card rounded-[1.5rem] border transition-all group relative flex flex-col h-full bg-[#0B0E14] overflow-hidden",
+        styles.border,
+        "hover:bg-white/[0.02]"
+      )}
+    >
+      {/* If Image exists */}
+      {item.imageUrl && (
+        <div className="h-40 w-full overflow-hidden border-b border-white/5">
+          <img 
+            src={item.imageUrl} 
+            alt={item.title} 
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+        </div>
+      )}
+
+      <div className="p-6 flex-1 flex flex-col">
+        {/* Header telemetry */}
+        <div className="flex items-center justify-between mb-4">
+          <div className={cn(
+            "px-2.5 py-1 rounded-full text-[10px] font-bold tracking-[0.1em]",
+            styles.bg,
+            styles.text
+          )}>
+            {item.source}
+          </div>
+          <div className="flex items-center space-x-1.5 text-[10px] font-bold text-muted-foreground/60 tracking-wider">
+            <Clock size={12} />
+            <span>{item.timeAgo}</span>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 space-y-3">
+          <h2 className="text-lg font-bold font-space tracking-tight leading-snug text-white/90 group-hover:text-white transition-colors line-clamp-3">
+            {item.title}
+          </h2>
+          
+          <p className="text-xs text-muted-foreground font-medium leading-relaxed line-clamp-4">
+            {item.description}
+          </p>
+        </div>
+
+        {/* Footer Link */}
+        <div className="mt-6 pt-4 border-t border-white/5 flex items-center gap-1.5">
+            <span className={cn(
+              "text-[9px] font-bold uppercase tracking-[0.2em] transition-colors",
+              styles.text
+            )}>
+              Read Full Article
+            </span>
+            <ExternalLink size={12} className={cn("transition-colors", styles.text)} />
+        </div>
+      </div>
+      
+      {/* Subtle Glow */}
+      <div className={cn("absolute -bottom-1 -right-1 h-32 w-32 blur-[50px] opacity-10 pointer-events-none", styles.bg)} />
+    </motion.a>
+  );
+};
+
+// --- Main Page ---
+
+const SOURCES = ["ALL", "THE HACKER NEWS", "KREBS ON SECURITY", "BLEEPINGCOMPUTER", "SECURITYWEEK", "DARK READING"];
 
 export default function NewsPage() {
-  const news = [
-    { title: "New LSB Steganography Technique Detected in Global Invoices", date: "2H AGO", source: "Intel Hub", category: "TECHNET" },
-    { title: "Deepfake Voice Scams Targeting Banking High-Net-Worth Entities", date: "4H AGO", source: "FS-ISAC", category: "THREAT" },
-    { title: "InterceptAI Model-v4 Now Live for Enterprise Alpha Testing", date: "1D AGO", source: "System", category: "UPDATE" },
-  ];
+  const [filter, setFilter] = useState<string>("ALL");
+  const [search, setSearch] = useState<string>("");
+  
+  const [articles, setArticles] = useState<NewsItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  // InView hook to trigger load more
+  const { ref, inView } = useInView({
+    threshold: 0,
+    rootMargin: "400px",
+  });
+
+  const fetchNews = useCallback(async (pageNum: int, isNewSearch: boolean) => {
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        limit: "15"
+      });
+      if (filter !== "ALL") params.append("source", filter);
+      if (search) params.append("search", search);
+
+      // Using the assumed API endpoint
+      const res = await fetch(`http://localhost:8000/api/v1/news?${params.toString()}`);
+      
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+
+      setArticles(prev => isNewSearch ? data.items : [...prev, ...data.items]);
+      setHasMore(data.hasMore);
+      setPage(pageNum);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, search]);
+
+  // Effect to handle new searches/filter changes
+  useEffect(() => {
+    // Debounce search slightly
+    const timeout = setTimeout(() => {
+      fetchNews(1, true);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [filter, search, fetchNews]);
+
+  // Effect to handle infinite scroll loading
+  useEffect(() => {
+    if (inView && hasMore && !loading && articles.length > 0) {
+      fetchNews(page + 1, false);
+    }
+  }, [inView, hasMore, loading, articles.length, page, fetchNews]);
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3 text-secondary font-bold text-[10px] uppercase tracking-[0.3em]">
-             <Globe size={14} />
-             <span>Security Intelligence Feed</span>
+      {/* Top Header metrics (optional based on mockup, they have a top row) */}
+      <div className="flex flex-wrap items-center gap-4 text-xs font-space tracking-widest mb-10">
+         {Object.entries(SOURCE_STYLES).map(([name, style]) => {
+           // We can count items or just display them as a telemetry header like the mockup
+           return (
+             <div key={name} className="flex items-center gap-2">
+                <span className={cn("w-2 h-2 rounded-full", style.bg.replace('/10', ''))} />
+                <span className={cn("font-bold uppercase", style.text)}>{name}</span>
+             </div>
+           )
+         })}
+      </div>
+
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+        
+        {/* Search */}
+        <div className="relative max-w-sm w-full group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
+            <Search size={16} />
           </div>
-          <h1 className="text-5xl font-bold font-space tracking-tight text-foreground">
-            SECURE <span className="text-secondary/60">NEWS</span>
-          </h1>
-          <p className="text-muted-foreground max-w-xl text-sm leading-relaxed font-medium">
-             Consolidated stream of global threat intelligence, zero-day alerts, and InterceptAI updates.
-          </p>
+          <input
+            type="text"
+            placeholder="Search articles..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#0B0E14] border border-white/5 focus:border-primary/50 text-white rounded-xl pl-11 pr-4 py-3 placeholder:text-muted-foreground/50 transition-all font-medium text-sm outline-none"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center space-x-1.5 p-1 bg-[#0B0E14] border border-white/5 rounded-[1rem] overflow-x-auto hide-scrollbar">
+          <div className="pl-3 pr-2 flex items-center text-muted-foreground/50">
+            <Filter size={14} />
+          </div>
+          {SOURCES.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "px-4 py-2.5 rounded-xl text-[10px] font-bold font-space uppercase tracking-widest transition-all whitespace-nowrap",
+                filter === f 
+                  ? "bg-white/10 text-white shadow-lg" 
+                  : "text-muted-foreground hover:bg-white/5 hover:text-white/80"
+              )}
+            >
+              {f}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-4">
-         <div className="lg:col-span-3 space-y-6">
-            {news.map((item, idx) => (
-               <motion.div 
-                 key={idx}
-                 initial={{ opacity: 0, x: -20 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 transition={{ delay: idx * 0.1 }}
-                 className="glass-card p-8 rounded-[2rem] border border-white/5 hover:bg-white/[0.03] transition-all cursor-pointer group"
-               >
-                  <div className="flex items-start justify-between">
-                     <div className="space-y-4 flex-1">
-                        <div className="flex items-center space-x-3">
-                           <span className="px-2 py-0.5 rounded bg-secondary/10 text-secondary text-[9px] font-bold tracking-widest uppercase">{item.category}</span>
-                           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{item.date}</span>
-                        </div>
-                        <h2 className="text-2xl font-bold font-space tracking-tight text-foreground group-hover:text-primary transition-colors">{item.title}</h2>
-                        <div className="flex items-center space-x-4 text-[10px] text-muted-foreground font-bold tracking-widest uppercase">
-                           <span>Source: {item.source}</span>
-                           <span>•</span>
-                           <span className="flex items-center space-x-1"><Share2 size={10} /> <span>3.2k Shares</span></span>
-                        </div>
-                     </div>
-                     <div className="h-12 w-12 rounded-xl border border-white/10 flex items-center justify-center text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary transition-all">
-                        <ExternalLink size={20} />
-                     </div>
-                  </div>
-               </motion.div>
+      {/* Grid */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-fr">
+         <AnimatePresence mode="popLayout">
+            {articles.map((item, idx) => (
+               <ArticleCard key={`${item.id}-${idx}`} item={item} />
             ))}
-         </div>
-
-         <div className="space-y-6">
-            <div className="glass-card rounded-[2rem] p-8 border border-white/5">
-                <div className="flex items-center space-x-3 mb-6">
-                   <Shield size={18} className="text-primary" />
-                   <h3 className="text-sm font-bold font-space uppercase tracking-tight">System Status</h3>
-                </div>
-                <div className="space-y-6">
-                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-muted-foreground">Neural Engine</span>
-                      <span className="text-secondary">Optimal</span>
-                   </div>
-                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-muted-foreground">Sentinel Nodes</span>
-                      <span className="text-secondary">482 Online</span>
-                   </div>
-                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
-                      <span className="text-muted-foreground">Detection Latency</span>
-                      <span className="text-primary">42ms</span>
-                   </div>
-                </div>
-            </div>
-         </div>
+         </AnimatePresence>
       </div>
+
+      {/* Loader & Intersection Target */}
+      <div ref={ref} className="w-full py-12 flex justify-center mt-6">
+         {loading && (
+           <div className="flex items-center space-x-3 text-primary animate-pulse">
+             <Loader2 size={18} className="animate-spin" />
+             <span className="text-xs font-bold font-space tracking-widest uppercase">Scraping Neuro-Web</span>
+           </div>
+         )}
+         {!loading && !hasMore && articles.length > 0 && (
+           <span className="text-xs text-muted-foreground font-space tracking-widest uppercase font-bold">End of Stream</span>
+         )}
+         {!loading && articles.length === 0 && (
+           <div className="text-center w-full py-12">
+             <Shield size={32} className="mx-auto text-muted-foreground/30 mb-4" />
+             <span className="text-sm text-muted-foreground font-medium">No intelligence intercepts found.</span>
+           </div>
+         )}
+      </div>
+
     </DashboardLayout>
   );
 }

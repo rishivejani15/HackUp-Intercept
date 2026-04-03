@@ -25,10 +25,10 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "ThreatGuard", icon: ShieldAlert, href: "/dashboard/alerts" },
-  { label: "Steganography", icon: EyeOff, href: "/dashboard/stego" },
-  { label: "Deepfake", icon: UserRound, href: "/dashboard/deepfake" },
+  { label: "Steganography", icon: EyeOff, href: "/dashboard/stego", comingSoon: true },
+  { label: "Deepfake", icon: UserRound, href: "/dashboard/deepfake", comingSoon: true },
   { label: "News", icon: Newspaper, href: "/dashboard/news" },
-  { label: "Community", icon: Users, href: "/dashboard/community" },
+  { label: "Community", icon: Users, href: "/dashboard/community", comingSoon: true },
   { label: "Ledger", icon: CreditCard, href: "/dashboard/transactions" },
 ];
 
@@ -84,7 +84,12 @@ export default function Header() {
                 )}
               >
                 <item.icon size={14} className={cn(isActive ? "text-primary" : "text-muted-foreground")} />
-                <span>{item.label}</span>
+                <div className="flex items-center space-x-1.5">
+                  <span>{item.label}</span>
+                  {item.comingSoon && (
+                    <span className="px-1 py-[1px] rounded bg-white/5 border border-white/10 text-[7px] text-muted-foreground">SOON</span>
+                  )}
+                </div>
               </Link>
             );
           })}

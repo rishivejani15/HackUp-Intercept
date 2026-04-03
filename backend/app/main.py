@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import transactions, alerts
+from app.api.endpoints import transactions, alerts, news
 from app.core.config import settings
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
@@ -17,6 +17,7 @@ app.add_middleware(
 # Include API Routers
 app.include_router(transactions.router, prefix=f"{settings.API_V1_STR}/transactions", tags=["transactions"])
 app.include_router(alerts.router, prefix=f"{settings.API_V1_STR}/alerts", tags=["alerts"])
+app.include_router(news.router, prefix=f"{settings.API_V1_STR}/news", tags=["news"])
 
 @app.get("/")
 async def root():

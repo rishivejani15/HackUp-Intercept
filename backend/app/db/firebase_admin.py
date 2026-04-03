@@ -17,7 +17,11 @@ def initialize_firebase():
                 cred = credentials.Certificate(cert_info)
             except json.JSONDecodeError:
                 # If it's a file path
-                cred = credentials.Certificate(service_account_info)
+                try:
+                    cred = credentials.Certificate(service_account_info)
+                except FileNotFoundError:
+                    print(f"Warning: Firebase Service Account Key not found at {service_account_info}.")
+                    return None
         else:
             # Fallback to default credentials or a local file for development
             # Placeholder for user's serviceAccountKey.json

@@ -22,7 +22,7 @@ export default function LandingNavbar() {
       "fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b",
       scrolled ? "bg-background/80 backdrop-blur-xl border-white/5 py-4" : "bg-transparent border-transparent py-6"
     )}>
-      <div className="container mx-auto px-6 flex items-center justify-between">
+      <div className="max-w-[1400px] mx-auto px-10 md:px-16 lg:px-24 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2 group">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
             <Shield className="text-white" size={20} />

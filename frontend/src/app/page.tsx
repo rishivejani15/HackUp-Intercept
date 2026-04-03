@@ -9,12 +9,14 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background selection:bg-primary/30">
       <LandingNavbar />
-      <div className="pt-[80px]">
-        <LiveTicker />
+      <div className="max-w-[1400px] mx-auto px-10 md:px-16 lg:px-24">
+        <div className="pt-[80px]">
+          <LiveTicker />
+        </div>
+        <Hero />
+        <LandingFeatures />
+        <LandingFAQ />
       </div>
-      <Hero />
-      <LandingFeatures />
-      <LandingFAQ />
       <LandingFooter />
     </main>
   );
