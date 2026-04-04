@@ -26,27 +26,27 @@ export default function SideDrillPanel({ node, transactions, onClose }: SideDril
   const decision = relatedTx.some(t => t.decision === "BLOCK") ? "BLOCK" : 
                    relatedTx.some(t => t.decision === "REVIEW") ? "REVIEW" : "APPROVE";
 
-  return (
-    <div className="fixed inset-y-0 right-0 w-96 z-[100] animate-in slide-in-from-right duration-300">
-      {/* Backdrop for closing */}
-      <div 
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm -left-[100vw]" 
-        onClick={onClose}
-      />
-      
-      {/* The Panel */}
-      <div className="relative h-full w-full bg-white backdrop-blur-2xl border-l border-slate-200 shadow-2xl shadow-slate-200/60 flex flex-col">
+   return (
+      <div className="fixed inset-0 z-[100] animate-in fade-in duration-200 pointer-events-none">
+         {/* Backdrop for closing */}
+         <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto"
+            onClick={onClose}
+         />
+
+         {/* The Panel */}
+         <div className="absolute top-0 right-0 h-full w-full max-w-[calc(100vw-0.75rem)] sm:max-w-96 bg-white backdrop-blur-2xl border-l border-slate-200 shadow-2xl shadow-slate-200/60 flex flex-col pointer-events-auto overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+            <div className="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between gap-3 min-w-0">
+               <div className="flex items-center gap-3 min-w-0">
              <div className={`p-2 rounded-lg ${isMerchant ? 'bg-indigo-500/10 text-indigo-600' : 'bg-primary-500/10 text-primary-600'}`}>
                 {isMerchant ? <Store size={20} /> : <User size={20} />}
              </div>
-             <div>
-                <h3 className="text-sm font-bold font-space uppercase tracking-widest text-slate-900">
+                   <div className="min-w-0">
+                        <h3 className="text-sm font-bold font-space uppercase tracking-widest text-slate-900 break-words">
                    {isMerchant ? 'Merchant Profile' : 'User Forensic'}
                 </h3>
-                <p className="text-[10px] font-mono text-slate-500">{entityId}</p>
+                        <p className="text-[10px] font-mono text-slate-500 break-all leading-snug">{entityId}</p>
              </div>
           </div>
           <button 
@@ -58,7 +58,7 @@ export default function SideDrillPanel({ node, transactions, onClose }: SideDril
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-8 custom-scrollbar">
           
           {/* Risk Card */}
           <div className="relative overflow-hidden p-6 rounded-[2rem] bg-slate-50 border border-slate-200">
@@ -72,8 +72,8 @@ export default function SideDrillPanel({ node, transactions, onClose }: SideDril
                    {decision}
                 </div>
              </div>
-             <div className="flex items-end gap-2">
-                <span className="text-4xl font-bold font-space text-slate-900">{(highestRisk * 100).toFixed(1)}</span>
+             <div className="flex items-end gap-2 min-w-0">
+                <span className="text-4xl font-bold font-space text-slate-900 tabular-nums">{(highestRisk * 100).toFixed(1)}</span>
                 <span className="text-xs font-bold text-slate-500 mb-1.5">%</span>
              </div>
              {/* Progress bar */}
@@ -89,12 +89,12 @@ export default function SideDrillPanel({ node, transactions, onClose }: SideDril
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-4">
-             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <div className="grid grid-cols-2 gap-4 min-w-0">
+             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 min-w-0">
                 <span className="text-[9px] font-bold uppercase tracking-tighter text-slate-500 block mb-1">Total Volume</span>
-                <span className="text-lg font-bold font-space text-slate-900">${totalAmount.toLocaleString()}</span>
+                <span className="text-lg font-bold font-space text-slate-900 break-words tabular-nums">${totalAmount.toLocaleString()}</span>
              </div>
-             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 min-w-0">
                 <span className="text-[9px] font-bold uppercase tracking-tighter text-slate-500 block mb-1">TX Count</span>
                 <span className="text-lg font-bold font-space text-slate-900">{relatedTx.length}</span>
              </div>
@@ -106,16 +106,16 @@ export default function SideDrillPanel({ node, transactions, onClose }: SideDril
                 <Activity size={14} className="text-primary" />
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-900">Recent Telemetry</h4>
              </div>
-             <div className="space-y-3">
+             <div className="space-y-3 min-w-0">
                 {relatedTx.map(tx => (
-                   <div key={tx.transaction_id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 transition-colors group cursor-pointer">
-                      <div className="flex items-center justify-between mb-1">
-                         <span className="text-[10px] font-mono text-slate-700">{tx.transaction_id}</span>
+                   <div key={tx.transaction_id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 transition-colors group cursor-pointer min-w-0 overflow-hidden">
+                      <div className="flex items-center justify-between gap-3 mb-1 min-w-0">
+                         <span className="text-[10px] font-mono text-slate-700 break-all leading-snug min-w-0">{tx.transaction_id}</span>
                          <span className={`text-[9px] font-bold ${
                             tx.decision === "BLOCK" ? 'text-error' : 'text-secondary'
-                         }`}>${tx.amount}</span>
+                         } tabular-nums shrink-0`}>${tx.amount}</span>
                       </div>
-                      <p className="text-[9px] text-slate-500 line-clamp-1">{tx.scenario_type.replace('_', ' ').toUpperCase()}</p>
+                      <p className="text-[9px] text-slate-500 line-clamp-2 break-words">{tx.scenario_type.replace('_', ' ').toUpperCase()}</p>
                    </div>
                 ))}
              </div>
@@ -123,11 +123,11 @@ export default function SideDrillPanel({ node, transactions, onClose }: SideDril
         </div>
 
         {/* Actions Footer */}
-        <div className="p-6 border-t border-slate-200 bg-slate-50 space-y-3">
-           <button className="w-full py-3 rounded-xl bg-error text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-error/20 hover:scale-[1.02] active:scale-95 transition-all">
+        <div className="p-5 sm:p-6 border-t border-slate-200 bg-slate-50 space-y-3">
+           <button className="w-full py-3 rounded-xl bg-error text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-error/20 hover:scale-[1.02] active:scale-95 transition-all whitespace-normal text-center">
               Initiate Hard Block
            </button>
-           <button className="w-full py-3 rounded-xl bg-white text-slate-900 text-xs font-bold uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-all">
+           <button className="w-full py-3 rounded-xl bg-white text-slate-900 text-xs font-bold uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-all whitespace-normal text-center">
               Request Forensic Audit
            </button>
         </div>

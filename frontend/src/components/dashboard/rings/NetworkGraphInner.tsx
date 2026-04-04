@@ -10,12 +10,14 @@ interface NetworkGraphInnerProps {
   onNodeSelect?: (node: any) => void;
   width?: number;
   height?: number;
+  isStreaming?: boolean;
 }
 
-export default function NetworkGraphInner({ transactions, onNodeSelect }: NetworkGraphInnerProps) {
+export default function NetworkGraphInner({ transactions, onNodeSelect, isStreaming = false }: NetworkGraphInnerProps) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [animationTick, setAnimationTick] = useState(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -31,9 +33,23 @@ export default function NetworkGraphInner({ transactions, onNodeSelect }: Networ
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!isStreaming) {
+      setAnimationTick(0);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setAnimationTick((value) => value + 1);
+    }, 60);
+
+    return () => window.clearInterval(timer);
+  }, [isStreaming]);
+
   const graphData = useMemo(() => {
     const nodes = new Map<string, any>();
     const links: any[] = [];
+    const merchantToUsers = new Map<string, Set<string>>();
 
     transactions.forEach((tx) => {
       const mId = tx.merchant_id;
@@ -92,13 +108,65 @@ export default function NetworkGraphInner({ transactions, onNodeSelect }: Networ
                decision === "BLOCK" ? "rgba(239, 68, 68, 0.4)" : 
                decision === "REVIEW" ? "rgba(245, 158, 11, 0.4)" : "rgba(16, 185, 129, 0.15)"
       });
+
+      if (!merchantToUsers.has(mId)) {
+        merchantToUsers.set(mId, new Set());
+      }
+      merchantToUsers.get(mId)?.add(uId);
     });
+
+    if (isStreaming) {
+      const merchantNodes = Array.from(nodes.values())
+        .filter((node) => node.group === "Merchant")
+        .sort((left, right) => {
+          const valueDelta = (right.val || 0) - (left.val || 0);
+          return valueDelta !== 0 ? valueDelta : String(left.id).localeCompare(String(right.id));
+        });
+
+      merchantNodes.forEach((node, index) => {
+        const nextNode = merchantNodes[(index + 1) % merchantNodes.length];
+        if (!nextNode || nextNode.id === node.id) return;
+
+        links.push({
+          source: node.id,
+          target: nextNode.id,
+          amount: 0,
+          decision: "STREAM",
+          scenario: "merchant_backbone",
+          bridge: true,
+          backbone: true,
+          color: "rgba(99, 102, 241, 0.42)",
+        });
+      });
+
+      merchantToUsers.forEach((userIds, merchantId) => {
+        const orderedUsers = Array.from(userIds);
+        if (orderedUsers.length < 2) return;
+
+        orderedUsers.forEach((userId, index) => {
+          const nextUserId = orderedUsers[(index + 1) % orderedUsers.length];
+          if (!nextUserId || nextUserId === userId) return;
+
+          links.push({
+            source: userId,
+            target: nextUserId,
+            amount: 0,
+            decision: "STREAM",
+            scenario: "network_bridge",
+            bridge: true,
+            backbone: false,
+            anchor: merchantId,
+            color: "rgba(99, 102, 241, 0.35)",
+          });
+        });
+      });
+    }
 
     return {
       nodes: Array.from(nodes.values()),
       links
     };
-  }, [transactions]);
+  }, [transactions, isStreaming]);
 
   // Handle zoom and cash burst when data changes
   const prevLinksCount = useRef(0);
@@ -133,25 +201,32 @@ export default function NetworkGraphInner({ transactions, onNodeSelect }: Networ
         nodeColor={(node: any) => node.color}
         nodeRelSize={6}
         linkColor={(link: any) => link.color}
-        linkWidth={(link: any) => link.scenario === "money_laundering" ? 2.5 : 1.5}
+        linkWidth={(link: any) => link.backbone ? 3.2 : link.bridge ? 2.4 : link.scenario === "money_laundering" ? 2.5 : 1.5}
         
         // --- CASH FLOW (One-Time Burst Configuration) ---
         linkDirectionalParticleWidth={(link: any) => {
-           const base = Math.min(Math.max(link.amount / 2000, 1.2), 4);
-           return link.scenario === "money_laundering" ? base * 1.5 : base;
+            if (link.backbone) return isStreaming ? 3.2 : 0;
+            if (link.bridge) return isStreaming ? 2.4 : 0;
+            const base = Math.min(Math.max(link.amount / 2000, 1.2), 4);
+            return link.scenario === "money_laundering" ? base * 1.5 : base;
         }}
         linkDirectionalParticleSpeed={(link: any) => {
-           return Math.min(Math.max(link.amount / 10000, 0.01), 0.08); // Snappy burst
+            if (link.backbone) return 0.09;
+            if (link.bridge) return 0.07;
+            return Math.min(Math.max(link.amount / 10000, 0.01), 0.08); // Snappy burst
         }}
         linkDirectionalParticleColor={(link: any) => {
+            if (link.backbone) return "#c7d2fe";
+            if (link.bridge) return "#93c5fd";
            if (link.scenario === "money_laundering") return "#a855f7"; // Royal Purple AML
            return link.decision === "BLOCK" ? "#ef4444" : 
                   link.decision === "REVIEW" ? "#f59e0b" : "#10b981";
         }}
-        linkTitle={(link: any) => `${link.scenario === "money_laundering" ? "[AML STRUCTURING]" : ""} Transaction: $${link.amount.toLocaleString()} [${link.decision}]`}
+          linkTitle={(link: any) => `${link.backbone ? "[MERCHANT BACKBONE]" : link.bridge ? "[NETWORK BRIDGE]" : link.scenario === "money_laundering" ? "[AML STRUCTURING]" : ""} Transaction: $${Number(link.amount || 0).toLocaleString()} [${link.decision}]`}
         
         backgroundColor="#ffffff"
         enableNodeDrag={true}
+        enablePointerInteraction={true}
         
         // --- STABILITY & CONTAINMENT ---
         warmupTicks={150} 
@@ -202,11 +277,99 @@ export default function NetworkGraphInner({ transactions, onNodeSelect }: Networ
         nodeCanvasObject={(node: any, ctx, globalScale) => {
           const label = node.id;
           const fontSize = 12 / globalScale;
+
+          const radius = Math.max(node.group === "Merchant" ? 10 : 6, (node.val || 3) * 1.5) / globalScale;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, radius * (node.group === "Merchant" ? (isStreaming ? 2.25 : 1.85) : isStreaming ? 1.9 : 1.5), 0, Math.PI * 2);
+          ctx.fillStyle = node.group === "Merchant" ? (isStreaming ? "rgba(99, 102, 241, 0.12)" : "rgba(99, 102, 241, 0.06)") : (isStreaming ? "rgba(99, 102, 241, 0.08)" : "rgba(15, 23, 42, 0.04)");
+          ctx.shadowBlur = isStreaming ? (node.group === "Merchant" ? 28 : 24) / globalScale : 10 / globalScale;
+          ctx.shadowColor = node.group === "Merchant" ? "#6366f1" : node.color || "rgba(99, 102, 241, 0.8)";
+          ctx.fill();
+          ctx.restore();
+
+          if (node.group === "Merchant") {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, radius * (isStreaming ? 1.35 : 1.15), 0, Math.PI * 2);
+            ctx.strokeStyle = isStreaming ? "rgba(255,255,255,0.25)" : "rgba(99,102,241,0.2)";
+            ctx.lineWidth = Math.max(1, 2 / globalScale);
+            ctx.shadowBlur = 18 / globalScale;
+            ctx.shadowColor = "#6366f1";
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          if (isStreaming) {
+            const pulse = 1 + ((animationTick % 18) / 18) * 0.25;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, radius * pulse, 0, Math.PI * 2);
+            ctx.strokeStyle = node.group === "Merchant" ? "rgba(255,255,255,0.5)" : `${node.color || "#6366f1"}55`;
+            ctx.lineWidth = Math.max(1, (node.group === "Merchant" ? 2 : 1.5) / globalScale);
+            ctx.shadowBlur = 16 / globalScale;
+            ctx.shadowColor = node.group === "Merchant" ? "#6366f1" : node.color || "#6366f1";
+            ctx.stroke();
+            ctx.restore();
+          }
+
           ctx.font = `${fontSize}px Inter, Sans-Serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
           ctx.fillText(label, node.x, node.y + 10);
+        }}
+        linkCanvasObject={(link: any, ctx, globalScale) => {
+          const source = link.source;
+          const target = link.target;
+          if (!source || !target || typeof source === "string" || typeof target === "string") return;
+
+          const sx = source.x;
+          const sy = source.y;
+          const tx = target.x;
+          const ty = target.y;
+          if (typeof sx !== "number" || typeof sy !== "number" || typeof tx !== "number" || typeof ty !== "number") return;
+
+          const midX = (sx + tx) / 2;
+          const midY = (sy + ty) / 2;
+          const dx = tx - sx;
+          const dy = ty - sy;
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+          const bend = link.backbone ? 0.28 : link.bridge ? 0.22 : 0.12;
+          const offsetX = (-dy / distance) * distance * bend;
+          const offsetY = (dx / distance) * distance * bend;
+
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.quadraticCurveTo(midX + offsetX, midY + offsetY, tx, ty);
+          ctx.strokeStyle = link.backbone
+            ? "rgba(199, 210, 254, 0.28)"
+            : link.bridge
+              ? "rgba(147, 197, 253, 0.22)"
+            : link.scenario === "money_laundering"
+              ? "rgba(168, 85, 247, 0.20)"
+              : link.decision === "BLOCK"
+                ? "rgba(239, 68, 68, 0.18)"
+                : link.decision === "REVIEW"
+                  ? "rgba(245, 158, 11, 0.16)"
+                  : "rgba(16, 185, 129, 0.10)";
+          ctx.lineWidth = Math.max(1, (link.backbone ? 3.2 : link.bridge ? 2.4 : 1.4) / globalScale);
+          ctx.shadowBlur = (isStreaming ? (link.backbone ? 22 : 16) : 6) / globalScale;
+          ctx.shadowColor = link.backbone ? "#c7d2fe" : link.bridge ? "#93c5fd" : link.color || "rgba(99, 102, 241, 0.5)";
+          ctx.setLineDash(isStreaming ? [10 / globalScale, 10 / globalScale] : []);
+          ctx.lineDashOffset = isStreaming ? -(animationTick * (link.backbone ? 3.5 : 2.5)) : 0;
+          ctx.stroke();
+
+          if (isStreaming) {
+            ctx.setLineDash([]);
+            ctx.strokeStyle = link.backbone ? "rgba(255, 255, 255, 0.42)" : link.bridge ? "rgba(255, 255, 255, 0.36)" : "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = Math.max(1, (link.backbone ? 1.2 : 0.75) / globalScale);
+            ctx.stroke();
+          }
+
+          ctx.restore();
         }}
       />
       )}

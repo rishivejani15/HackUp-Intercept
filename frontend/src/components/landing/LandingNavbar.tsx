@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Shield, ChevronRight, Menu, X } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function LandingNavbar() {
   const { user } = useAuth();
@@ -24,9 +25,7 @@ export default function LandingNavbar() {
     )}>
       <div className="max-w-[1400px] mx-auto px-10 md:px-16 lg:px-24 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2 group">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
-            <Shield className="text-white" size={20} />
-          </div>
+          <BrandLogo size={40} className="group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-primary/20" />
           <span className="text-2xl font-bold font-space tracking-tighter text-foreground">
             INTERCEPT<span className="text-primary">AI</span>
           </span>

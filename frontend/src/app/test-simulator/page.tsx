@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { Play, Square, ArrowLeft, ShieldAlert, CheckCircle2, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Square, ArrowLeft, Clock, X, Loader2, Sparkles } from "lucide-react";
 import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_INTERCEPT_API_BASE_URL || "/api/v1";
 
 type FirestoreTransaction = {
   id?: string;
@@ -67,15 +69,63 @@ type ExplainabilityDetails = {
   top_negative_signals?: ExplainSignal[];
 };
 
+function renderStructuredExplanation(summary: string): React.ReactNode {
+  const sections = summary
+    .split(/\n{2,}/)
+    .map((section) => section.trim())
+    .filter(Boolean);
+
+  if (sections.length === 0) {
+    return <div className="whitespace-pre-wrap leading-relaxed">{summary}</div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {sections.map((section, index) => {
+        const lines = section.split(/\n/).map((line) => line.trim()).filter(Boolean);
+        const [heading, ...bodyLines] = lines;
+        const hasBullets = bodyLines.some((line) => /^[-*•]/.test(line));
+
+        return (
+          <div key={`${heading}-${index}`} className="rounded-2xl border border-blue-100 bg-white/70 p-4 shadow-sm">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 mb-3">
+              {heading || `Section ${index + 1}`}
+            </div>
+            <div className={hasBullets ? "space-y-2" : "space-y-3"}>
+              {bodyLines.length > 0 ? (
+                bodyLines.map((line, lineIndex) => {
+                  const isBullet = /^[-*•]/.test(line);
+                  const content = isBullet ? line.replace(/^[-*•]\s*/, "") : line;
+                  return (
+                    <div key={`${lineIndex}-${content}`} className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {isBullet ? <span className="font-bold text-blue-600 mr-2">•</span> : null}
+                      {content}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{section}</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 type DisplayRow = {
   id: string;
   merchant: string;
   amount: number;
   risk: number;
   fraudProbability?: number;
-  decision: string;
+  decision: "APPROVE" | "BLOCK" | "REVIEW" | "ERROR";
   reason: string;
   time: string;
+  paymentMethod: string;
+  transactionTimestamp: string;
+  features: Record<string, number>;
   explainability?: ExplainabilityDetails | null;
 };
 
@@ -86,10 +136,134 @@ type WaterfallPoint = {
   direction: "increased risk" | "reduced risk";
 };
 
-function normalizeDecision(value: unknown): "FRAUD" | "LEGITIMATE" | "REVIEW" {
+const FEATURE_LABELS: Record<string, string> = {
+  amount: "Transaction Amount",
+  amount_deviation: "Spending Deviation",
+  anomaly_score: "Anomaly Score",
+  acct_open_date: "Account Start",
+  current_age: "Age",
+  credit_score: "Credit Score",
+  user_avg_amount: "Average Spending",
+  user_std_amount: "Spending Variability",
+  user_tx_frequency: "Transaction Frequency",
+  transaction_velocity: "Transaction Speed",
+  merchant_risk_score: "Merchant Risk Score",
+  merchant_fraud_rate: "Merchant Fraud Rate",
+  merchant_avg_amount: "Merchant Average Ticket",
+  merchant_std_amount: "Merchant Amount Variability",
+  geo_cluster_fraud_rate: "Location Risk",
+  peer_cluster_fraud_rate: "Peer Risk",
+  card_to_history_ratio: "Card Usage Ratio",
+  is_new_user: "User Status",
+  rolling_mean_amount: "Recent Spending Average",
+  rolling_std_amount: "Recent Spending Spread",
+  transaction_history_length: "Account History Length",
+  transaction_gap_from_first_day: "Time Since First Activity",
+  merchant_tx_count: "Merchant Activity Volume",
+  merchant_outlier_score: "Merchant Outlier Score",
+  cluster_outlier_score: "Cluster Outlier Score",
+  high_card_velocity_flag: "High Velocity Flag",
+  mcc_description: "Merchant Category",
+  payment_method: "Payment Method",
+  timestamp: "Timestamp",
+};
+
+const HIDDEN_FEATURES = new Set([
+  "cvv",
+  "card_number",
+  "client_id_card",
+  "transaction_id",
+  "source_doc_id",
+  "id",
+  "_docId",
+  "address",
+  "zip",
+  "latitude",
+  "longitude",
+]);
+
+function humanizeKey(key: string): string {
+  if (FEATURE_LABELS[key]) return FEATURE_LABELS[key];
+  return key
+    .replaceAll(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .trim();
+}
+
+function formatFeatureValue(key: string, value: number | string | undefined): string {
+  if (value === undefined || value === null || value === "") return "--";
+
+  if (key === "is_new_user") {
+    return Number(value) === 1 ? "New User" : "Existing User";
+  }
+
+  if (key === "acct_open_date") {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "--";
+    const year = Math.floor(numeric / 100);
+    const month = numeric % 100;
+    if (!year || !month) return "--";
+
+    const opened = new Date(year, month - 1, 1);
+    const now = new Date();
+    const months = Math.max(0, (now.getFullYear() - opened.getFullYear()) * 12 + (now.getMonth() - opened.getMonth()));
+    const years = Math.floor(months / 12);
+    const remainder = months % 12;
+    return years > 0 ? `${years}y ${remainder}m` : `${remainder}m`;
+  }
+
+  if (key === "payment_method") {
+    const method = String(value).replaceAll("_", " ");
+    return method.replace(/\b\w/g, (match) => match.toUpperCase());
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (Math.abs(value) >= 1000 && Number.isInteger(value)) return value.toLocaleString();
+    if (Math.abs(value) < 1 && value !== 0) return value.toFixed(3);
+    if (Math.abs(value) < 10) return value.toFixed(2);
+    return value.toLocaleString();
+  }
+
+  return String(value);
+}
+
+function getFeatureValue(features: Record<string, number>, key: string, fallback = 0): number {
+  const value = features[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function parseTimestamp(value: unknown): string {
+  if (!value) return "--";
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function formatProcessingTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "--";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function getRiskBand(risk: number): "Low" | "Medium" | "High" {
+  if (risk >= 80) return "High";
+  if (risk >= 50) return "Medium";
+  return "Low";
+}
+
+function getDecisionLabel(decision: DisplayRow["decision"]): string {
+  if (decision === "REVIEW") return "MFA";
+  return decision;
+}
+
+function getCategoryLabel(key: string): string {
+  return humanizeKey(key);
+}
+
+function normalizeDecision(value: unknown): "APPROVE" | "BLOCK" | "REVIEW" {
   const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "fraud" || normalized === "fraudulent") return "FRAUD";
-  if (normalized === "legitimate" || normalized === "safe") return "LEGITIMATE";
+  if (normalized === "fraud" || normalized === "fraudulent") return "BLOCK";
+  if (normalized === "legitimate" || normalized === "safe") return "APPROVE";
   return "REVIEW";
 }
 
@@ -137,13 +311,40 @@ function buildExplainPayload(tx: FirestoreTransaction): ExplainRequestPayload {
   };
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function toDisplayRowFromFirestore(tx: FirestoreTransaction): DisplayRow | null {
+  const txId = String(tx.transaction_id || tx.id || tx._docId || "").trim();
+  if (!txId) return null;
+
+  const rawDecision = String(tx.status || tx.fraud || "").toLowerCase();
+  const decision: DisplayRow["decision"] =
+    rawDecision === "fraud" || rawDecision === "yes"
+      ? "BLOCK"
+      : rawDecision === "safe" || rawDecision === "legitimate" || rawDecision === "no"
+        ? "APPROVE"
+        : rawDecision === "error"
+          ? "ERROR"
+          : "REVIEW";
+
+  const ts = toDateText(tx.timestamp || tx.created_at || tx.time);
+  return {
+    id: txId,
+    merchant: String(tx.merchant_name || tx.merchant || "Unknown Merchant"),
+    amount: toFiniteNumber(tx.amount, 0),
+    risk: toFiniteNumber((tx as Record<string, unknown>).risk_score, 0),
+    fraudProbability: toFiniteNumber((tx as Record<string, unknown>).fraud_probability, 0),
+    decision,
+    reason: String((tx as Record<string, unknown>).top_feature || "Model analysis complete"),
+    time: ts,
+    paymentMethod: String(tx.payment_method || (tx.meta as Record<string, unknown> | undefined)?.payment_method || "card"),
+    transactionTimestamp: ts,
+    features: (tx.features || {}) as Record<string, number>,
+    explainability: ((tx as Record<string, unknown>).explainability as ExplainabilityDetails | undefined) || null,
+  };
 }
 
 function getWaterfallPoints(explainability?: ExplainabilityDetails | null): WaterfallPoint[] {
@@ -172,21 +373,28 @@ function getWaterfallPoints(explainability?: ExplainabilityDetails | null): Wate
 export default function TestSimulatorPage() {
   const [running, setRunning] = useState(false);
   const [intervalMs, setIntervalMs] = useState(1200);
-  const [statusMessage, setStatusMessage] = useState("Click Start Transactions to process Firebase data one by one.");
+  const [statusMessage, setStatusMessage] = useState("Click Simulate to start the realtime bridge.");
   const [rows, setRows] = useState<DisplayRow[]>([]);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [runCompletedAt, setRunCompletedAt] = useState<number | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [bridgeConfig, setBridgeConfig] = useState({
+    apiKey: "",
+    supabaseUrl: "",
+    supabaseKey: "",
+  });
+  const [loadingExplain, setLoadingExplain] = useState<Record<string, boolean>>({});
 
   const runningRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const websocketRef = useRef<WebSocket | null>(null);
 
   const { data: liveTransactions, loading, error } = useFirestoreCollection<FirestoreTransaction>("transactions");
 
   const pushDebug = (message: string, payload?: unknown) => {
-    const now = new Date().toISOString();
-    const serialized = payload ? ` ${JSON.stringify(payload)}` : "";
-    const entry = `[${now}] ${message}${serialized}`;
     console.debug("[SIM-DEBUG]", message, payload || "");
-    setDebugLogs((prev) => [entry, ...prev].slice(0, 16));
   };
 
   const orderedLiveTransactions = useMemo(() => {
@@ -213,146 +421,338 @@ export default function TestSimulatorPage() {
     });
   }, [orderedLiveTransactions]);
 
+  useEffect(() => {
+    if (orderedLiveTransactions.length === 0) return;
+
+    const mappedRows = orderedLiveTransactions
+      .map((tx) => toDisplayRowFromFirestore(tx))
+      .filter((item): item is DisplayRow => Boolean(item));
+
+    if (mappedRows.length === 0) return;
+
+    setRows((prev) => {
+      const byId = new Map(prev.map((item) => [item.id, item] as const));
+      for (const nextRow of mappedRows) {
+        const existing = byId.get(nextRow.id);
+        byId.set(nextRow.id, existing ? { ...existing, ...nextRow } : nextRow);
+      }
+      return Array.from(byId.values()).sort(
+        (left, right) => toMillis(left.transactionTimestamp) - toMillis(right.transactionTimestamp)
+      );
+    });
+  }, [orderedLiveTransactions]);
+
   const stats = useMemo(() => {
     const total = rows.length;
-    const fraud = rows.filter((row) => row.decision === "FRAUD").length;
-    const safe = rows.filter((row) => row.decision === "SAFE" || row.decision === "LEGITIMATE").length;
+    const fraud = rows.filter((row) => row.decision === "BLOCK").length;
+    const safe = rows.filter((row) => row.decision === "APPROVE").length;
     const errors = rows.filter((row) => row.decision === "ERROR").length;
-    return { total, fraud, safe, errors };
+    const avgConfidence = rows.length
+      ? rows.reduce((sum, row) => {
+          const confidence = Math.max(Number(row.fraudProbability || 0), Number(row.risk || 0) / 100);
+          return sum + confidence;
+        }, 0) / rows.length
+      : 0;
+
+    return { total, fraud, safe, errors, avgConfidence };
   }, [rows]);
+
+  const selectedRow = useMemo(() => {
+    if (rows.length === 0) return null;
+    if (!selectedRowId) return rows[rows.length - 1];
+    return rows.find((row) => row.id === selectedRowId) || rows[rows.length - 1];
+  }, [rows, selectedRowId]);
+
+  useEffect(() => {
+    if (!selectedRow || selectedRow.explainability || loadingExplain[selectedRow.id]) return;
+
+    const tx = orderedLiveTransactions.find((t) => String(t.transaction_id || t.id || t._docId) === selectedRow.id);
+    if (!tx) return;
+
+    const payload = buildExplainPayload(tx);
+    setLoadingExplain((prev) => ({ ...prev, [selectedRow.id]: true }));
+
+    fetch(`/api/simulator/explain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((res) => res.json())
+      .then((data: ExplainApiResponse) => {
+        if (data.status === "success" && data.data?.explainability) {
+          setRows((prev) =>
+            prev.map((r) => (r.id === selectedRow.id ? { ...r, explainability: data.data!.explainability } : r))
+          );
+        }
+      })
+      .catch((err) => console.error("Explain fetch error", err))
+      .finally(() => {
+        setLoadingExplain((prev) => ({ ...prev, [selectedRow.id]: false }));
+      });
+  }, [selectedRow, loadingExplain, orderedLiveTransactions]);
+
+  const processingTimeMs = useMemo(() => {
+    if (!runStartedAt) return 0;
+    const end = runCompletedAt || (running ? Date.now() : runCompletedAt || Date.now());
+    return Math.max(0, end - runStartedAt);
+  }, [runStartedAt, runCompletedAt, running]);
+
+  const detectionAccuracy = useMemo(() => {
+    if (rows.length === 0) return 0;
+    return Math.round(Math.max(0, Math.min(1, stats.avgConfidence)) * 100);
+  }, [rows.length, stats.avgConfidence]);
+
+  const selectedRowFeatures = selectedRow?.features || {};
+  const selectedShapPoints = useMemo(() => getWaterfallPoints(selectedRow?.explainability).slice(0, 6), [selectedRow]);
+  const categoryScores = useMemo(() => {
+    const scores = selectedRow?.explainability?.category_scores || {};
+    return Object.entries(scores)
+      .map(([key, value]) => ({ key, label: getCategoryLabel(key), value: Number(value || 0) }))
+      .sort((left, right) => right.value - left.value);
+  }, [selectedRow]);
+
+  const detailBlocks = useMemo(() => {
+    if (!selectedRow) return null;
+
+    const transactionInfo = [
+      { label: "Amount", value: `$${selectedRow.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+      { label: "Merchant", value: selectedRow.merchant },
+      { label: "Payment Method", value: formatFeatureValue("payment_method", selectedRow.paymentMethod) },
+      { label: "Timestamp", value: parseTimestamp(selectedRow.transactionTimestamp) },
+    ];
+
+    const userInfo = [
+      { label: "Age", value: formatFeatureValue("current_age", getFeatureValue(selectedRowFeatures, "current_age")) },
+      { label: "Credit Score", value: formatFeatureValue("credit_score", getFeatureValue(selectedRowFeatures, "credit_score")) },
+      { label: "Account Age", value: formatFeatureValue("acct_open_date", getFeatureValue(selectedRowFeatures, "acct_open_date")) },
+      { label: "User Type", value: formatFeatureValue("is_new_user", getFeatureValue(selectedRowFeatures, "is_new_user")) },
+    ];
+
+    const behaviorInfo = [
+      { label: "Transaction Speed", value: formatFeatureValue("transaction_velocity", getFeatureValue(selectedRowFeatures, "transaction_velocity")) },
+      { label: "Average Spending", value: formatFeatureValue("user_avg_amount", getFeatureValue(selectedRowFeatures, "user_avg_amount")) },
+      { label: "Transaction Frequency", value: formatFeatureValue("user_tx_frequency", getFeatureValue(selectedRowFeatures, "user_tx_frequency")) },
+      { label: "Spending Deviation", value: formatFeatureValue("amount_deviation", getFeatureValue(selectedRowFeatures, "amount_deviation")) },
+    ];
+
+    const riskInfo = [
+      { label: "Merchant Risk Score", value: formatFeatureValue("merchant_risk_score", getFeatureValue(selectedRowFeatures, "merchant_risk_score")) },
+      { label: "Merchant Fraud Rate", value: formatFeatureValue("merchant_fraud_rate", getFeatureValue(selectedRowFeatures, "merchant_fraud_rate")) },
+      { label: "Anomaly Score", value: formatFeatureValue("anomaly_score", getFeatureValue(selectedRowFeatures, "anomaly_score")) },
+    ];
+
+    return { transactionInfo, userInfo, behaviorInfo, riskInfo };
+  }, [selectedRow, selectedRowFeatures]);
 
   const startSimulation = async () => {
     if (runningRef.current) return;
 
-    setRows([]);
-    setExpandedRowId(null);
-    setDebugLogs([]);
-    setStatusMessage("Starting sequential explainability checks from Firebase...");
-    setRunning(true);
-    runningRef.current = true;
-
-    pushDebug("Start pressed - loaded transactions", {
-      total: orderedLiveTransactions.length,
-      valid_for_api: validTransactions.length,
-      skipped: orderedLiveTransactions.length - validTransactions.length,
-    });
-
-    if (validTransactions.length === 0) {
-      setStatusMessage("No valid records found: require transaction_id + features + meta.");
-      pushDebug("No valid transactions to process");
-      runningRef.current = false;
-      setRunning(false);
+    if (!bridgeConfig.apiKey.trim() || !bridgeConfig.supabaseUrl.trim() || !bridgeConfig.supabaseKey.trim()) {
+      setConfigError("API key, Supabase URL and Supabase key are required.");
+      setConfigOpen(true);
       return;
     }
 
-    let processedCount = 0;
+    setRows([]);
+    setSelectedRowId(null);
+    setRunStartedAt(Date.now());
+    setRunCompletedAt(null);
+    setStatusMessage("Starting realtime Supabase listener...");
+    setRunning(true);
+    runningRef.current = true;
 
-    for (const tx of validTransactions) {
-      if (!runningRef.current) {
-        break;
-      }
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    websocketRef.current?.close();
 
-      const payload = buildExplainPayload(tx);
-      const txId = payload.transaction_id;
-      const txTime = payload.meta.timestamp;
-
-      pushDebug("Calling explain API", {
-        endpoint: "/api/simulator/explain",
-        transaction_id: payload.transaction_id,
-        merchant_name: payload.meta.merchant_name,
-        payment_method: payload.meta.payment_method,
-        amount: payload.features.amount,
-        source_doc_id: payload.source_doc_id,
-        features_count: Object.keys(payload.features).length,
+    try {
+      const bootstrapResponse = await fetch(`${API_BASE_URL}/supabase-bridge/run-e2e`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          credential: bridgeConfig.apiKey.trim(),
+          supabase_url: bridgeConfig.supabaseUrl.trim(),
+          supabase_key: bridgeConfig.supabaseKey.trim(),
+          base_url: "https://samyak000-fraud-detection-model.hf.space",
+          limit: 500,
+        }),
+        signal: abortRef.current.signal,
       });
 
-      try {
-        const response = await fetch(`/api/simulator/explain`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(errText || "Explain API request failed");
+      if (!bootstrapResponse.ok) {
+        let detail = "Bootstrap request failed";
+        try {
+          const payload = (await bootstrapResponse.json()) as { detail?: string };
+          if (payload?.detail) detail = payload.detail;
+        } catch {
+          const errText = await bootstrapResponse.text();
+          if (errText) detail = errText;
         }
-
-        const result = (await response.json()) as ExplainApiResponse;
-        pushDebug("Explain API success", {
-          transaction_id: txId,
-          status: result.status,
-          classification: result.data?.classification,
-          risk_score: result.data?.risk_score,
-        });
-        const decision = normalizeDecision(result.data?.classification);
-        const risk = Number(result.data?.risk_score || 0);
-        const reason = result.data?.explainability?.explanation_summary || "Model explanation generated";
-        const fraudProbability = toFiniteNumber(
-          result.data?.fraud_probability ?? result.data?.explainability?.fraud_probability,
-          0
-        );
-
-        setRows((prev) => [
-          ...prev,
-          {
-            id: txId,
-            merchant: payload.meta.merchant_name,
-            amount: Number(payload.features.amount || 0),
-            risk,
-            fraudProbability,
-            decision,
-            reason,
-            time: txTime,
-            explainability: result.data?.explainability || null,
-          },
-        ]);
-
-        setStatusMessage(`Processed ${txId.slice(0, 14)}... -> ${decision} (Risk ${risk.toFixed(2)})`);
-        processedCount += 1;
-      } catch (fetchError) {
-        const message = fetchError instanceof Error ? fetchError.message : "Unknown error";
-        pushDebug("Explain API failed", {
-          transaction_id: txId,
-          error: message,
-        });
-
-        setRows((prev) => [
-          ...prev,
-          {
-            id: txId,
-            merchant: payload.meta.merchant_name,
-            amount: Number(payload.features.amount || 0),
-            risk: 0,
-            fraudProbability: 0,
-            decision: "ERROR",
-            reason: message,
-            time: txTime,
-            explainability: null,
-          },
-        ]);
-
-        setStatusMessage(`Failed ${txId.slice(0, 14)}... -> ${message}`);
-        processedCount += 1;
+        throw new Error(`${bootstrapResponse.status} ${detail}`);
       }
 
-      await wait(intervalMs);
+      const bootstrapResult = (await bootstrapResponse.json()) as {
+        total_processed: number;
+        total_saved: number;
+        rows: Array<{
+          transaction_id: string;
+          classification: string;
+          risk_score: number;
+          fraud_probability?: number;
+          reason?: string;
+        }>;
+      };
+
+      for (const row of bootstrapResult.rows) {
+        const decision = normalizeDecision(row.classification);
+        const risk = Number(row.risk_score || 0);
+        setRows((prev) => {
+          const byId = new Map(prev.map((item) => [item.id, item] as const));
+          byId.set(row.transaction_id, {
+            id: row.transaction_id,
+            merchant: "Supabase Merchant",
+            amount: 0,
+            risk,
+            fraudProbability: Number(row.fraud_probability || 0),
+            decision,
+            reason: row.reason || "Model analysis complete",
+            time: new Date().toISOString(),
+            transactionTimestamp: new Date().toISOString(),
+            paymentMethod: "card",
+            features: {},
+            explainability: null,
+          });
+          return Array.from(byId.values());
+        });
+      }
+
+      setStatusMessage(
+        `Bootstrap complete. Processed ${bootstrapResult.total_processed}, saved ${bootstrapResult.total_saved}. Connecting realtime...`
+      );
+    } catch (bootstrapError) {
+      const message = bootstrapError instanceof Error ? bootstrapError.message : "Unknown error";
+      setStatusMessage(`Pipeline failed: ${message}`);
+      pushDebug("Bootstrap failed", { error: message });
+      runningRef.current = false;
+      setRunning(false);
+      setRunCompletedAt(Date.now());
+      return;
     }
 
-    runningRef.current = false;
-    setRunning(false);
-    setStatusMessage("Processing complete.");
-    pushDebug("Processing complete", {
-      processed: processedCount,
-      attempted: validTransactions.length,
-    });
+    const wsBase = API_BASE_URL
+      .replace(/\/api\/v1\/?$/, "")
+      .replace(/^http:\/\//i, "ws://")
+      .replace(/^https:\/\//i, "wss://");
+
+    const wsUrl = `${wsBase}/api/v1/supabase-bridge/ws-realtime`;
+    const ws = new WebSocket(wsUrl);
+    websocketRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(
+        JSON.stringify({
+          credential: bridgeConfig.apiKey.trim(),
+          supabase_url: bridgeConfig.supabaseUrl.trim(),
+          supabase_key: bridgeConfig.supabaseKey.trim(),
+          base_url: "https://samyak000-fraud-detection-model.hf.space",
+          limit: 200,
+        })
+      );
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(String(event.data || "{}")) as {
+          type?: string;
+          detail?: string;
+          listener_started?: boolean;
+          listener_error?: string | null;
+          total_processed?: number;
+          total_saved?: number;
+          row?: {
+            transaction_id: string;
+            classification: string;
+            risk_score: number;
+            fraud_probability?: number;
+            reason?: string;
+          };
+        };
+
+        if (payload.type === "error") {
+          setStatusMessage(`Pipeline failed: ${payload.detail || "Unknown error"}`);
+          runningRef.current = false;
+          setRunning(false);
+          setRunCompletedAt(Date.now());
+          return;
+        }
+
+        if (payload.type === "ready") {
+          if (payload.listener_started) {
+            setStatusMessage("Realtime listener active. New incoming transactions will stream automatically.");
+          } else {
+            setStatusMessage(`Realtime listener unavailable: ${payload.listener_error || "unknown error"}`);
+          }
+          return;
+        }
+
+        if (payload.type === "live_row" && payload.row) {
+          const row = payload.row;
+          const decision = normalizeDecision(row.classification);
+          const risk = Number(row.risk_score || 0);
+
+          setRows((prev) => {
+            const byId = new Map(prev.map((item) => [item.id, item] as const));
+            byId.set(row.transaction_id, {
+              id: row.transaction_id,
+              merchant: "Supabase Merchant",
+              amount: 0,
+              risk,
+              fraudProbability: Number(row.fraud_probability || 0),
+              decision,
+              reason: row.reason || "Model analysis complete",
+              time: new Date().toISOString(),
+              transactionTimestamp: new Date().toISOString(),
+              paymentMethod: "card",
+              features: {},
+              explainability: null,
+            });
+            return Array.from(byId.values());
+          });
+
+          setSelectedRowId(row.transaction_id);
+          setStatusMessage(
+            `Live: ${row.transaction_id.slice(0, 14)}... -> ${decision} (Risk ${risk.toFixed(2)})`
+          );
+          return;
+        }
+      } catch (err) {
+        pushDebug("WS parse error", err);
+      }
+    };
+
+    ws.onerror = () => {
+      setStatusMessage("Realtime websocket error. Check backend status and credentials.");
+    };
+
+    ws.onclose = () => {
+      if (runningRef.current) {
+        setStatusMessage("Realtime websocket disconnected.");
+      }
+      runningRef.current = false;
+      setRunning(false);
+      setRunCompletedAt(Date.now());
+    };
   };
 
   const stopSimulation = () => {
     runningRef.current = false;
+    abortRef.current?.abort();
+    websocketRef.current?.close();
+    websocketRef.current = null;
     setRunning(false);
+    setRunCompletedAt(Date.now());
     setStatusMessage("Simulation stopped.");
     pushDebug("Processing stopped by user");
   };
@@ -360,281 +760,421 @@ export default function TestSimulatorPage() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="space-y-2">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3 max-w-3xl">
             <Link href="/dashboard/settings" className="text-xs font-bold uppercase tracking-widest text-primary inline-flex items-center gap-2">
               <ArrowLeft size={14} />
               Back to Key Settings
             </Link>
-            <h1 className="text-4xl font-bold font-space tracking-tight text-foreground">Transaction Simulator Test Bench</h1>
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              Fetches transactions from Firebase, sends them one-by-one to explain API, then displays returned risk.
-            </p>
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-secondary">Analyst Intelligence Console</p>
+              <h1 className="text-4xl md:text-5xl font-bold font-space tracking-tight text-foreground">Transaction Intelligence Dashboard</h1>
+              <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+                A human-readable view of live transaction risk. The interface focuses on what happened, why it happened, and how risky it is.
+              </p>
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-bold uppercase tracking-widest">
-            <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Shown: {stats.total}</div>
-            <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Fraud: {stats.fraud}</div>
-            <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Safe: {stats.safe}</div>
-            <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Errors: {stats.errors}</div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => {
+                setConfigError(null);
+                setConfigOpen(true);
+              }}
+              disabled={running}
+              className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-bold font-space uppercase tracking-widest inline-flex items-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
+            >
+              <Play size={14} />
+              Simulate
+            </button>
+            <button
+              onClick={stopSimulation}
+              disabled={!running}
+              className="h-12 px-6 rounded-2xl border border-black/10 bg-white text-[10px] font-bold font-space uppercase tracking-widest inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              <Square size={14} />
+              Stop
+            </button>
+            <div className="h-12 px-4 rounded-2xl border border-black/10 bg-white text-[10px] font-bold uppercase tracking-widest text-muted-foreground inline-flex items-center gap-2">
+              <Clock size={14} />
+              {formatProcessingTime(processingTimeMs)}
+            </div>
           </div>
         </div>
 
-        <div className="glass-card rounded-3xl border border-black/10 p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Processing Interval (ms)</label>
-            <input
-              type="number"
-              min={250}
-              value={intervalMs}
-              onChange={(e) => setIntervalMs(Number(e.target.value || 1200))}
-              className="mt-2 h-11 w-full rounded-xl border border-black/10 bg-slate-100 px-3 text-xs font-bold"
-            />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 text-xs font-bold uppercase tracking-widest">
+          <div className="rounded-2xl border border-green-200 bg-white px-5 py-4 shadow-sm">
+            <div className="text-[10px] text-green-600 mb-1">Total Transactions</div>
+            <div className="text-3xl font-black text-slate-900">{stats.total}</div>
           </div>
-          <div className="md:col-span-2 flex items-end">
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{statusMessage}</div>
+          <div className="rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-sm">
+            <div className="text-[10px] text-red-500 mb-1">Fraud Detected</div>
+            <div className="text-3xl font-black text-slate-900">{stats.fraud}</div>
+          </div>
+          <div className="rounded-2xl border border-blue-200 bg-white px-5 py-4 shadow-sm">
+            <div className="text-[10px] text-blue-600 mb-1">Processing Time</div>
+            <div className="text-3xl font-black text-slate-900">{formatProcessingTime(processingTimeMs)}</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-sm">
+            <div className="text-[10px] text-emerald-600 mb-1">Detection Accuracy</div>
+            <div className="text-3xl font-black text-slate-900">{detectionAccuracy}%</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-bold uppercase tracking-widest">
-          <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Firebase Total: {orderedLiveTransactions.length}</div>
-          <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Valid For API: {validTransactions.length}</div>
-          <div className="bg-slate-100 border border-black/10 rounded-xl px-4 py-3">Skipped: {orderedLiveTransactions.length - validTransactions.length}</div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={startSimulation}
-            disabled={running || loading}
-            className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-bold font-space uppercase tracking-widest inline-flex items-center gap-2 disabled:opacity-50"
-          >
-            <Play size={14} />
-            Start Transactions
-          </button>
-          <button
-            onClick={stopSimulation}
-            disabled={!running}
-            className="h-12 px-6 rounded-2xl border border-black/10 bg-slate-100 text-[10px] font-bold font-space uppercase tracking-widest inline-flex items-center gap-2 disabled:opacity-50"
-          >
-            <Square size={14} />
-            Stop
-          </button>
-        </div>
-
-        <div className="glass-card rounded-2xl border border-black/10 p-4">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Debug Trace</div>
-          <div className="max-h-40 overflow-y-auto space-y-2">
-            {debugLogs.length === 0 ? (
-              <div className="text-xs text-muted-foreground">No debug events yet. Click Start Transactions.</div>
-            ) : (
-              debugLogs.map((line, index) => (
-                <div key={`${line}-${index}`} className="text-[11px] font-mono text-muted-foreground break-all">
-                  {line}
-                </div>
-              ))
-            )}
+        <div className="flex flex-wrap items-center gap-6 text-xs font-bold uppercase tracking-widest">
+          <span className="text-muted-foreground">{statusMessage}</span>
+          <div className="flex items-center gap-4 pl-4 border-l border-black/10">
+            <span className="text-muted-foreground">Streamed: <span className="text-foreground">{stats.total}</span></span>
+            <span className="text-emerald-600">Safe: <span className="text-emerald-700">{stats.safe}</span></span>
+            <span className="text-red-600">Fraud: <span className="text-red-700">{stats.fraud}</span></span>
+            <span className="text-red-500">Errors: <span className="text-red-600">{stats.errors}</span></span>
           </div>
         </div>
 
         {error ? (
-          <div className="text-xs font-bold uppercase tracking-widest text-error">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold uppercase tracking-widest text-error">
             Firestore read error: {error.message}
           </div>
         ) : null}
 
-        <div className="glass-card rounded-3xl border border-black/10 p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead>
-                <tr className="border-b border-black/10 bg-slate-100">
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">More</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Transaction</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Merchant</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Amount</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Risk</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Fraud Prob</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Decision</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Reason</th>
-                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-widest">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const decision = row.decision.toUpperCase();
-                  const isExpanded = expandedRowId === row.id;
-                  const waterfallPoints = getWaterfallPoints(row.explainability);
-                  const maxAbsShap = Math.max(...waterfallPoints.map((point) => Math.abs(point.shapValue)), 1);
-                  const categoryEntries = Object.entries(row.explainability?.category_scores || {}).sort((a, b) => b[1] - a[1]);
+        <div className="grid gap-8 xl:grid-cols-[420px_minmax(0,1fr)]">
+          <section className="rounded-[2rem] border border-black/10 bg-white shadow-sm overflow-hidden flex flex-col">
+            <div className="border-b border-black/10 px-6 py-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold font-space text-slate-900">Live Transaction Feed</h2>
+                <p className="text-xs text-muted-foreground mt-1">Click a transaction to inspect the human-readable breakdown.</p>
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-slate-50 px-3 py-1 rounded-full border border-black/5">{rows.length} items</div>
+            </div>
+
+            <div className="flex-1 max-h-[760px] overflow-y-auto p-3 space-y-3 no-scrollbar">
+              {rows.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-black/10 bg-slate-50 px-4 py-10 text-center text-sm text-muted-foreground">
+                  Start the stream to load transactions here.
+                </div>
+              ) : (
+                [...rows].slice().reverse().map((row) => {
+                  const isSelected = selectedRow?.id === row.id;
+                  const decision = getDecisionLabel(row.decision);
+                  const decisionTone =
+                    row.decision === "BLOCK"
+                      ? "text-red-600 bg-red-50 border-red-200"
+                      : row.decision === "REVIEW"
+                        ? "text-amber-600 bg-amber-50 border-amber-200"
+                        : "text-emerald-600 bg-emerald-50 border-emerald-200";
 
                   return (
-                    <React.Fragment key={row.id}>
-                      <tr className="border-b border-black/10">
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => setExpandedRowId((prev) => (prev === row.id ? null : row.id))}
-                            className="h-7 w-7 rounded-lg border border-black/15 bg-slate-100 inline-flex items-center justify-center hover:bg-slate-200 transition-colors"
-                            aria-label={isExpanded ? "Collapse transaction details" : "Expand transaction details"}
-                          >
-                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-xs font-mono">{row.id.slice(0, 14)}...</td>
-                        <td className="px-4 py-3 text-xs font-bold">{row.merchant}</td>
-                        <td className="px-4 py-3 text-xs font-bold">${row.amount.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-xs font-bold">{row.risk.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-xs font-bold">{(toFiniteNumber(row.fraudProbability, 0) * 100).toFixed(3)}%</td>
-                        <td className="px-4 py-3">
-                          {decision === "FRAUD" ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-error">
-                              <ShieldAlert size={12} />
-                              Fraud
-                            </span>
-                          ) : decision === "SAFE" || decision === "LEGITIMATE" ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-secondary">
-                              <CheckCircle2 size={12} />
-                              Legitimate
-                            </span>
-                          ) : decision === "ERROR" ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-error">
-                              <ShieldAlert size={12} />
-                              Error
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-tertiary">
-                              <Clock size={12} />
-                              Review
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">{row.reason}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">{row.time}</td>
-                      </tr>
-
-                      {isExpanded ? (
-                        <tr className="border-b border-black/10 bg-slate-50/60">
-                          <td colSpan={9} className="p-4 md:p-6">
-                            <div className="rounded-2xl border border-black/10 bg-white p-4 md:p-6 space-y-5">
-                              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-[10px] font-bold uppercase tracking-widest">
-                                <div className="rounded-xl border border-black/10 bg-slate-100 px-3 py-2">Risk Score: {row.risk.toFixed(2)}</div>
-                                <div className="rounded-xl border border-black/10 bg-slate-100 px-3 py-2">Fraud Prob: {(toFiniteNumber(row.fraudProbability, 0) * 100).toFixed(3)}%</div>
-                                <div className="rounded-xl border border-black/10 bg-slate-100 px-3 py-2">Base Value: {toFiniteNumber(row.explainability?.base_value, 0).toFixed(6)}</div>
-                                <div className="rounded-xl border border-black/10 bg-slate-100 px-3 py-2">Fraud Type: {String(row.explainability?.fraud_type || row.decision).toUpperCase()}</div>
-                                <div className="rounded-xl border border-black/10 bg-slate-100 px-3 py-2">Type Conf: {toFiniteNumber(row.explainability?.fraud_type_confidence, 0).toFixed(4)}</div>
-                              </div>
-
-                              <div>
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Summary</div>
-                                <div className="rounded-xl border border-black/10 bg-slate-100 px-4 py-3 text-xs text-foreground">
-                                  {row.explainability?.explanation_summary || row.reason}
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                                <div>
-                                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Waterfall Signals</div>
-                                  <div className="rounded-xl border border-black/10 bg-slate-100 p-4 space-y-3">
-                                    {waterfallPoints.length === 0 ? (
-                                      <div className="text-xs text-muted-foreground">No SHAP signals available for this transaction.</div>
-                                    ) : (
-                                      waterfallPoints.map((point) => {
-                                        const widthPct = Math.max(4, (Math.abs(point.shapValue) / maxAbsShap) * 100);
-                                        const isPositive = point.shapValue > 0;
-                                        return (
-                                          <div key={point.key} className="space-y-1">
-                                            <div className="flex items-center justify-between text-[11px]">
-                                              <span className="font-semibold text-foreground">{point.label}</span>
-                                              <span className={isPositive ? "font-mono text-error" : "font-mono text-secondary"}>
-                                                {point.shapValue > 0 ? "+" : ""}{point.shapValue.toFixed(6)}
-                                              </span>
-                                            </div>
-                                            <div className="relative h-2 rounded-full bg-white border border-black/10 overflow-hidden">
-                                              <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black/20" />
-                                              {isPositive ? (
-                                                <div className="absolute left-1/2 top-0 h-full bg-error/70" style={{ width: `${Math.min(50, widthPct / 2)}%` }} />
-                                              ) : (
-                                                <div className="absolute right-1/2 top-0 h-full bg-secondary/80" style={{ width: `${Math.min(50, widthPct / 2)}%` }} />
-                                              )}
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{point.direction}</div>
-                                          </div>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="space-y-5">
-                                  <div>
-                                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Category Scores</div>
-                                    <div className="rounded-xl border border-black/10 bg-slate-100 p-3 space-y-2">
-                                      {categoryEntries.length === 0 ? (
-                                        <div className="text-xs text-muted-foreground">No category score data.</div>
-                                      ) : (
-                                        categoryEntries.map(([name, score]) => (
-                                          <div key={name} className="text-xs flex items-center justify-between gap-3">
-                                            <span className="font-semibold text-foreground">{name.replaceAll("_", " ")}</span>
-                                            <span className="font-mono text-muted-foreground">{toFiniteNumber(score, 0).toFixed(6)}</span>
-                                          </div>
-                                        ))
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Top Positive</div>
-                                      <div className="rounded-xl border border-black/10 bg-slate-100 p-3 space-y-2">
-                                        {(row.explainability?.top_positive_signals || []).slice(0, 5).map((signal, idx) => (
-                                          <div key={`${signal.feature || "p"}-${idx}`} className="text-xs">
-                                            <div className="font-semibold text-foreground">{signal.label || signal.feature || `Signal ${idx + 1}`}</div>
-                                            <div className="text-muted-foreground font-mono">
-                                              value: {toFiniteNumber(signal.value, 0).toFixed(4)} | shap: +{Math.abs(toFiniteNumber(signal.shap_value, 0)).toFixed(6)}
-                                            </div>
-                                          </div>
-                                        ))}
-                                        {(row.explainability?.top_positive_signals || []).length === 0 ? (
-                                          <div className="text-xs text-muted-foreground">No positive signals.</div>
-                                        ) : null}
-                                      </div>
-                                    </div>
-
-                                    <div>
-                                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Top Negative</div>
-                                      <div className="rounded-xl border border-black/10 bg-slate-100 p-3 space-y-2">
-                                        {(row.explainability?.top_negative_signals || []).slice(0, 5).map((signal, idx) => (
-                                          <div key={`${signal.feature || "n"}-${idx}`} className="text-xs">
-                                            <div className="font-semibold text-foreground">{signal.label || signal.feature || `Signal ${idx + 1}`}</div>
-                                            <div className="text-muted-foreground font-mono">
-                                              value: {toFiniteNumber(signal.value, 0).toFixed(4)} | shap: -{Math.abs(toFiniteNumber(signal.shap_value, 0)).toFixed(6)}
-                                            </div>
-                                          </div>
-                                        ))}
-                                        {(row.explainability?.top_negative_signals || []).length === 0 ? (
-                                          <div className="text-xs text-muted-foreground">No negative signals.</div>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </React.Fragment>
+                    <button
+                      key={row.id}
+                      onClick={() => setSelectedRowId(row.id)}
+                      className={`w-full text-left rounded-2xl border px-4 py-4 transition-all duration-200 ${isSelected ? "border-primary bg-blue-50 shadow-[0_0_0_2px_rgba(59,130,246,0.1)]" : "border-black/10 bg-white hover:border-blue-200 hover:bg-blue-50/30"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold font-space text-slate-900 truncate">{row.id}</span>
+                            <span className={`text-[9px] font-bold uppercase tracking-widest border rounded-full px-2 py-1 flex-shrink-0 ${decisionTone}`}>{decision}</span>
+                          </div>
+                          <div className="mt-2 text-sm text-slate-700 font-semibold truncate">{row.merchant}</div>
+                          <div className="mt-1 text-[10px] text-muted-foreground">{parseTimestamp(row.transactionTimestamp)}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-black text-slate-900">${row.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className={`mt-1 text-[10px] font-bold uppercase tracking-widest ${row.decision === "BLOCK" ? "text-red-500" : row.decision === "REVIEW" ? "text-amber-500" : "text-emerald-600"}`}>
+                            {row.decision === "REVIEW" ? "MFA" : row.decision}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
                   );
-                })}
-                {!loading && rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Click Start Transactions to fetch from Firebase and display one-by-one results.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+                })
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-8">
+            <div className="rounded-[2rem] border border-black/10 bg-white shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-black/10 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold font-space text-slate-900">Transaction Detail Panel</h2>
+                  <p className="text-xs text-muted-foreground mt-1">What happened, why it happened, and how risky it is.</p>
+                </div>
+                <div className="rounded-full border border-black/10 bg-slate-50 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                  Risk: <span className={selectedRow ? (selectedRow.risk >= 80 ? "text-red-600" : selectedRow.risk >= 50 ? "text-amber-600" : "text-emerald-600") : "text-gray-600"}>{selectedRow ? selectedRow.risk.toFixed(1) : "N/A"}</span>
+                </div>
+              </div>
+
+              {selectedRow && detailBlocks ? (
+                <div className="p-6 space-y-6">
+                  <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] items-start">
+                    <div className="rounded-[1.75rem] border border-black/10 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Risk Score</div>
+                      <div className="mt-3 flex items-end gap-2">
+                        <span className="text-5xl font-black text-slate-900">{selectedRow.risk.toFixed(1)}</span>
+                        <span className="text-sm font-bold text-muted-foreground mb-2">/100</span>
+                      </div>
+                      <div className="mt-4 h-3 rounded-full bg-slate-200 overflow-hidden border border-black/5 shadow-inner">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${selectedRow.risk >= 80 ? "bg-gradient-to-r from-red-400 to-red-500 shadow-lg shadow-red-200" : selectedRow.risk >= 50 ? "bg-gradient-to-r from-amber-400 to-amber-500 shadow-lg shadow-amber-200" : "bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-lg shadow-emerald-200"}`}
+                          style={{ width: `${Math.max(2, Math.min(100, selectedRow.risk))}%` }}
+                        />
+                      </div>
+                      <div className="mt-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">{getRiskBand(selectedRow.risk)} Risk</div>
+                    </div>
+
+                    <div className="rounded-[1.75rem] border border-black/10 bg-white p-5">
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {detailBlocks.transactionInfo.map((item) => (
+                          <div key={item.label} className="rounded-2xl border border-black/10 bg-slate-50 px-4 py-3">
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{item.label}</div>
+                            <div className="mt-1 text-sm font-bold text-slate-900">{item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-[1.75rem] border border-black/10 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">User Info</div>
+                      <div className="space-y-3">
+                        {detailBlocks.userInfo.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3">
+                            <span className="text-xs text-muted-foreground">{item.label}</span>
+                            <span className="font-bold text-slate-900 text-right text-sm">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.75rem] border border-black/10 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Behavior Insights</div>
+                      <div className="space-y-3">
+                        {detailBlocks.behaviorInfo.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3">
+                            <span className="text-xs text-muted-foreground">{item.label}</span>
+                            <span className="font-bold text-slate-900 text-right text-sm">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.75rem] border border-black/10 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Risk Insights</div>
+                      <div className="space-y-3">
+                        {detailBlocks.riskInfo.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3">
+                            <span className="text-xs text-muted-foreground">{item.label}</span>
+                            <span className="font-bold text-slate-900 text-right text-sm">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.75rem] border border-black/10 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Decision</div>
+                      <div className={`inline-flex items-center justify-center rounded-2xl px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] border mb-3 ${selectedRow.decision === "BLOCK" ? "bg-red-50 border-red-200 text-red-600" : selectedRow.decision === "REVIEW" ? "bg-amber-50 border-amber-200 text-amber-600" : "bg-emerald-50 border-emerald-200 text-emerald-600"}`}>
+                        {getDecisionLabel(selectedRow.decision)}
+                      </div>
+                      <div className="text-xs text-slate-700 leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap no-scrollbar">{selectedRow.reason}</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.75rem] border border-blue-100 bg-gradient-to-b from-blue-50/50 to-white p-5 shadow-sm mt-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles className="w-5 h-5 text-blue-500" />
+                      <div className="text-xs font-bold uppercase tracking-widest text-blue-600">AI Analyst Explanation</div>
+                    </div>
+                    {loadingExplain[selectedRow.id] ? (
+                      <div className="flex items-center gap-3 text-sm text-blue-600/70 py-6">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Generating AI insights based on transaction features...</span>
+                      </div>
+                    ) : selectedRow.explainability?.explanation_summary ? (
+                      <div className="max-h-[32rem] overflow-y-auto no-scrollbar bg-white/50 rounded-2xl p-4 border border-blue-50">
+                        {renderStructuredExplanation(selectedRow.explainability.explanation_summary)}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-500 italic bg-white/50 rounded-2xl p-4 border border-slate-50">
+                        No AI explanation available. {selectedRow.reason}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="px-6 py-16 text-center text-muted-foreground">
+                  Start the stream and select a transaction to see the detail breakdown.
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-8 xl:grid-cols-2">
+              <div className="rounded-[2rem] border border-black/10 bg-white shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold font-space text-slate-900">SHAP Feature Influence</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Red increases risk, green reduces it.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {selectedShapPoints.length === 0 ? (
+                    <div className="text-sm text-muted-foreground rounded-[1.5rem] border border-dashed border-black/10 bg-slate-50 px-4 py-10 text-center">
+                      No explanation signals available yet.
+                    </div>
+                  ) : (
+                    selectedShapPoints.map((point) => {
+                      const maxValue = Math.max(...selectedShapPoints.map((entry) => Math.abs(entry.shapValue)), 1);
+                      const width = Math.max(8, (Math.abs(point.shapValue) / maxValue) * 100);
+                      const isPositive = point.shapValue > 0;
+                      return (
+                        <div key={point.key} className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-semibold text-slate-900 text-sm">{point.label}</span>
+                            <span className={`font-mono text-xs font-bold ${isPositive ? "text-red-500" : "text-emerald-600"}`}>
+                              {isPositive ? "+" : ""}{point.shapValue.toFixed(4)}
+                            </span>
+                          </div>
+                          <div className="h-3 rounded-full bg-slate-200 border border-black/5 overflow-hidden shadow-sm">
+                            <div className={`h-full rounded-full transition-all ${isPositive ? "bg-gradient-to-r from-red-400 to-red-500 shadow-lg shadow-red-200/50" : "bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-lg shadow-emerald-200/50"}`} style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-black/10 bg-white shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold font-space text-slate-900">Fraud Category Breakdown</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Category weights summarized into a readable split.</p>
+                  </div>
+                </div>
+
+                {categoryScores.length === 0 ? (
+                  <div className="text-sm text-muted-foreground rounded-[1.5rem] border border-dashed border-black/10 bg-slate-50 px-4 py-10 text-center">
+                    No category score data available.
+                  </div>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] items-center">
+                    <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-full border border-black/10 bg-gradient-to-b from-slate-50 to-slate-100 shadow-inner">
+                      <div
+                        className="h-40 w-40 rounded-full border border-black/5 shadow-lg"
+                        style={{
+                          background: `conic-gradient(${categoryScores
+                            .map((entry, index) => {
+                              const palette = ["#2563eb", "#ef4444", "#14b8a6", "#f59e0b", "#8b5cf6", "#0ea5e9"];
+                              return `${palette[index % palette.length]} ${entry.value * 100}%`;
+                            })
+                            .join(", ")})`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      {categoryScores.map((entry, index) => {
+                        const palette = ["#2563eb", "#ef4444", "#14b8a6", "#f59e0b", "#8b5cf6", "#0ea5e9"];
+                        const color = palette[index % palette.length];
+                        const percent = Math.max(4, entry.value * 100);
+                        return (
+                          <div key={entry.key} className="space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-semibold text-slate-900 text-sm">{entry.label}</span>
+                              <span className="font-mono text-sm font-bold text-slate-700">{(entry.value * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-slate-200 overflow-hidden border border-black/5">
+                              <div className="h-full rounded-full transition-all shadow-md" style={{ width: `${percent}%`, backgroundColor: color }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         </div>
       </div>
+
+      {configOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[2rem] border border-black/10 bg-white shadow-2xl shadow-black/20 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-black/10 px-6 py-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-secondary">Simulation Setup</p>
+                <h3 className="mt-1 text-xl font-bold font-space text-slate-900">Connect Supabase Pipeline</h3>
+              </div>
+              <button
+                onClick={() => setConfigOpen(false)}
+                className="h-10 w-10 rounded-xl border border-black/10 bg-slate-50 text-slate-500 inline-flex items-center justify-center hover:bg-slate-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {configError ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold uppercase tracking-widest text-amber-700">
+                  {configError}
+                </div>
+              ) : null}
+              <label className="block space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Our API key / SIM code</span>
+                <input
+                  type="password"
+                  value={bridgeConfig.apiKey}
+                  onChange={(event) => setBridgeConfig((current) => ({ ...current, apiKey: event.target.value }))}
+                  className="w-full rounded-2xl border border-black/10 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:bg-white"
+                  placeholder="ik_live_... or SIM-..."
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Supabase URL</span>
+                <input
+                  type="text"
+                  value={bridgeConfig.supabaseUrl}
+                  onChange={(event) => setBridgeConfig((current) => ({ ...current, supabaseUrl: event.target.value }))}
+                  className="w-full rounded-2xl border border-black/10 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:bg-white"
+                  placeholder="https://project.supabase.co"
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Supabase key</span>
+                <input
+                  type="password"
+                  value={bridgeConfig.supabaseKey}
+                  onChange={(event) => setBridgeConfig((current) => ({ ...current, supabaseKey: event.target.value }))}
+                  className="w-full rounded-2xl border border-black/10 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:bg-white"
+                  placeholder="service role key"
+                />
+              </label>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setConfigOpen(false)}
+                  className="h-11 rounded-2xl border border-black/10 bg-white px-5 text-[10px] font-bold uppercase tracking-widest text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setConfigOpen(false);
+                    await startSimulation();
+                  }}
+                  disabled={running}
+                  className="h-11 rounded-2xl bg-primary px-5 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                  Start Simulation
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </DashboardLayout>
   );
 }

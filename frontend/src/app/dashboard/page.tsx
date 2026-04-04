@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import KPICard from "@/components/dashboard/KPICard";
 import RiskHistogram from "@/components/dashboard/RiskHistogram";
 import FeatureImportance from "@/components/dashboard/FeatureImportance";
 import TransactionTable from "@/components/dashboard/TransactionTable";
+import { useFraudDetection } from "@/hooks/useFraudDetection";
+import { calculateKPIStats } from "@/services/fraudDetectionService";
 import { 
   Users, 
   ShieldAlert, 
@@ -23,6 +25,53 @@ export default function DashboardPage() {
   const [issuedKey, setIssuedKey] = useState("");
   const [keyMessage, setKeyMessage] = useState("");
   const [keyLoading, setKeyLoading] = useState(false);
+  
+  // Fetch fraud detection data from Firebase
+  const { data: fraudData, loading: fraudLoading, error: fraudError } = useFraudDetection(200);
+
+  const aggregatedFraudRows = useMemo(() => {
+    const grouped = new Map<
+      string,
+      { scenario: string; count: number; flagged: number; riskTotal: number }
+    >();
+
+    for (const row of fraudData) {
+      const scenario = row.scenario_type || "unknown";
+      const bucket = grouped.get(scenario) || {
+        scenario,
+        count: 0,
+        flagged: 0,
+        riskTotal: 0,
+      };
+
+      bucket.count += 1;
+      bucket.flagged += row.flagged ? 1 : 0;
+      bucket.riskTotal += Number(row.risk_score || 0);
+      grouped.set(scenario, bucket);
+    }
+
+    return [...grouped.values()]
+      .map((item) => ({
+        ...item,
+        avgRisk: item.count > 0 ? (item.riskTotal / item.count) * 100 : 0,
+      }))
+      .sort((a, b) => b.avgRisk - a.avgRisk);
+  }, [fraudData]);
+
+  // Calculate KPI statistics from fraud data
+  const kpiStats = useMemo(() => {
+    if (fraudData.length > 0) {
+      console.log('Dashboard: Processing', fraudData.length, 'fraud records');
+    }
+    return calculateKPIStats(fraudData);
+  }, [fraudData]);
+  
+  // Show error if data fetch fails
+  useEffect(() => {
+    if (fraudError) {
+      console.error('Dashboard: Fraud data error:', fraudError);
+    }
+  }, [fraudError]);
 
   const handleGetKey = async () => {
     if (keyLoading) return;
@@ -158,32 +207,32 @@ export default function DashboardPage() {
       {/* KPI Cards Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
-          title="Total Transactions"
-          value="152,342"
+          title="Total Entities"
+          value={kpiStats.totalTransactions.toLocaleString()}
           icon={Users}
           trend="+12.5%"
           trendUp={true}
           color="primary"
         />
         <KPICard
-          title="Fraud Detected"
-          value="48"
+          title="Flagged Entities"
+          value={kpiStats.fraudDetected.toString()}
           icon={ShieldAlert}
           trend="+2.4%"
           trendUp={false}
           color="destructive"
         />
         <KPICard
-          title="Processing Time"
-          value="24.8ms"
+          title="Avg Risk Score"
+          value={`${kpiStats.avgProcessingTime}%`}
           icon={Zap}
-          trend="-2.1ms"
+          trend="+1.2%"
           trendUp={true}
           color="success"
         />
         <KPICard
-          title="Detection Radius"
-          value="99.4%"
+          title="Detection Rate"
+          value={`${kpiStats.detectionRate}%`}
           icon={Target}
           trend="+0.2%"
           trendUp={true}
@@ -200,17 +249,17 @@ export default function DashboardPage() {
                 <ChevronRight size={16} />
              </div>
           </div>
-          <RiskHistogram />
+          <RiskHistogram data={fraudData} loading={fraudLoading} />
         </div>
         
         <div className="glass-card rounded-[2rem] p-10 relative overflow-hidden group">
           <div className="flex items-center justify-between mb-8">
-             <h2 className="text-xl font-bold font-space uppercase tracking-wider">Influence Vectors</h2>
+             <h2 className="text-xl font-bold font-space uppercase tracking-wider">Attack Vectors</h2>
              <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-muted-foreground">
                 <ChevronRight size={16} />
              </div>
           </div>
-          <FeatureImportance />
+          <FeatureImportance data={fraudData} loading={fraudLoading} />
         </div>
       </div>
 
@@ -232,6 +281,41 @@ export default function DashboardPage() {
               Generate Audit
             </button>
           </div>
+        </div>
+
+        <div className="mb-8 overflow-x-auto rounded-2xl border border-black/10 bg-white/60">
+          <table className="w-full min-w-[640px] text-left border-collapse">
+            <thead>
+              <tr className="border-b border-black/10 text-[10px] font-bold font-space uppercase tracking-widest text-muted-foreground">
+                <th className="px-4 py-3">Scenario</th>
+                <th className="px-4 py-3">Entities</th>
+                <th className="px-4 py-3">Flagged</th>
+                <th className="px-4 py-3">Avg Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aggregatedFraudRows.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-4 text-xs text-muted-foreground" colSpan={4}>
+                    {fraudLoading
+                      ? "Loading fraud aggregates..."
+                      : "No fraud records available yet."}
+                  </td>
+                </tr>
+              ) : (
+                aggregatedFraudRows.slice(0, 8).map((row) => (
+                  <tr key={row.scenario} className="border-b border-black/5 text-xs">
+                    <td className="px-4 py-3 font-semibold text-foreground">
+                      {row.scenario.replaceAll("_", " ")}
+                    </td>
+                    <td className="px-4 py-3">{row.count}</td>
+                    <td className="px-4 py-3">{row.flagged}</td>
+                    <td className="px-4 py-3">{row.avgRisk.toFixed(1)}%</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
         
         <TransactionTable />

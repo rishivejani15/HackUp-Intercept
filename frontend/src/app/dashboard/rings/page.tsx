@@ -2,64 +2,103 @@
 
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { fraudData, FraudTransaction } from "@/data/fraudData";
 import { Network } from "lucide-react";
 import FraudSimulation from "@/components/dashboard/rings/FraudSimulation";
 import NetworkGraph from "@/components/dashboard/rings/NetworkGraph";
 import LiveAlertPanel from "@/components/dashboard/rings/LiveAlertPanel";
 import TransactionTable from "@/components/dashboard/rings/TransactionTable";
 import SideDrillPanel from "@/components/dashboard/rings/SideDrillPanel";
+import ForensicSimulatorPanel from "@/components/dashboard/rings/ForensicSimulatorPanel";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { mapFirestoreDocToRingsTransaction } from "@/lib/ringsMapper";
+import { FirestoreFraudTransaction, RingsGraphNode, RingsTransaction } from "@/types/rings";
+import { useAuth } from "@/context/AuthContext";
+
+const DEFAULT_FRAUD_ORG_ID = "Fj3o8mxoqOcCNrOBcdTXmOmAtsi1";
+
+function getTransactionTime(tx: RingsTransaction): number {
+  if (!tx.checked_at) {
+    return 0;
+  }
+  const parsed = Date.parse(tx.checked_at);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export default function GraphRingsPage() {
-  const [activeScenario, setActiveScenario] = useState<string | null>(null);
-  const [activeTransactions, setActiveTransactions] = useState<FraudTransaction[]>([]);
+  const { user, loading } = useAuth();
+  const [orgId] = useState<string>(
+    process.env.NEXT_PUBLIC_FRAUD_ORG_ID || DEFAULT_FRAUD_ORG_ID
+  );
+  const [allTransactions, setAllTransactions] = useState<RingsTransaction[]>([]);
+  const [pausedTransactions, setPausedTransactions] = useState<RingsTransaction[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [fullScenarioTXs, setFullScenarioTXs] = useState<FraudTransaction[]>([]);
-  const [streamIndex, setStreamIndex] = useState(0);
-  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<RingsGraphNode | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<RingsTransaction | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Load normal baseline initially
+  // Subscribe to nested collection: fraud_detection/{orgId}/transactions
   useEffect(() => {
-    setActiveTransactions(fraudData.filter(t => t.scenario_type === "normal"));
-    setIsStreaming(false);
-  }, []);
+    if (!orgId) return;
+    if (loading) return;
+    if (!user) return;
 
-  const handleSimulate = (scenario: string, transactions: FraudTransaction[]) => {
-    setActiveScenario(scenario === "" ? null : scenario);
-    
-    // Reset to normal baseline before starting attack stream
-    const normalBase = fraudData.filter(t => t.scenario_type === "normal");
-    setActiveTransactions(normalBase);
-    setStreamIndex(0);
+    const txQuery = query(
+      collection(db, "fraud_detection", orgId, "transactions"),
+      limit(500)
+    );
 
-    if (scenario !== "") {
-       // Filter out just the attack-specific ones to stream
-       const attackOnly = transactions.filter(t => t.scenario_type === scenario);
-       setFullScenarioTXs(attackOnly);
-       setIsStreaming(true); 
-    } else {
-       setFullScenarioTXs([]);
-       setIsStreaming(false);
+    const unsubscribe = onSnapshot(
+      txQuery,
+      (snapshot) => {
+        const mapped = snapshot.docs
+          .map((docSnap) => mapFirestoreDocToRingsTransaction(docSnap.id, docSnap.data() as FirestoreFraudTransaction))
+          .sort((a, b) => getTransactionTime(a) - getTransactionTime(b));
+
+        setFetchError(null);
+        setAllTransactions(mapped);
+        setPausedTransactions((prev) => {
+          if (isStreaming || prev.length > 0) {
+            return prev;
+          }
+          return mapped;
+        });
+      },
+      (error) => {
+        console.error("Failed to read rings transactions:", error);
+        if (error.code === "permission-denied") {
+          setFetchError(
+            "Missing or insufficient permissions. Ensure firestore.rules allows authenticated read on fraud_detection/{orgId}/transactions and deploy updated rules."
+          );
+          return;
+        }
+        setFetchError(error.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [orgId, isStreaming, loading, user]);
+
+  const activeTransactions = isStreaming ? allTransactions : pausedTransactions;
+  const displayError = !loading && !user ? "Please sign in to view Rings telemetry." : fetchError;
+
+  const handleToggleStreaming = (nextValue: boolean) => {
+    if (!nextValue) {
+      setPausedTransactions(allTransactions);
     }
+    setIsStreaming(nextValue);
   };
 
-  // Streaming Engine
-  useEffect(() => {
-    if (!isStreaming || fullScenarioTXs.length === 0) return;
-
-    if (streamIndex >= fullScenarioTXs.length) {
-       setIsStreaming(false);
-       return;
+  const handleNodeSelect = (node: any) => {
+    setSelectedNode(node);
+    // Find the first transaction related to this node
+    const relatedTx = activeTransactions.find(
+      (tx) => tx.user_id === node.id || tx.merchant_id === node.id
+    );
+    if (relatedTx) {
+      setSelectedTransaction(relatedTx);
     }
-
-    const interval = setInterval(() => {
-       const nextTx = fullScenarioTXs[streamIndex];
-       setActiveTransactions(prev => [...prev, nextTx]);
-       setStreamIndex(prev => prev + 1);
-    }, 1200); // 1.2s for a slightly faster, snappy forensic flow
-
-    return () => clearInterval(interval);
-  }, [isStreaming, fullScenarioTXs, streamIndex]);
+  };
 
   return (
     <DashboardLayout>
@@ -78,13 +117,18 @@ export default function GraphRingsPage() {
         </div>
       </div>
 
-      <FraudSimulation 
-        onSimulate={handleSimulate} 
-        activeScenario={activeScenario} 
+      <FraudSimulation
         isStreaming={isStreaming}
-        onToggleStreaming={setIsStreaming}
+        onToggleStreaming={handleToggleStreaming}
         transactions={activeTransactions}
+        orgId={orgId}
       />
+
+      {displayError && (
+        <div className="mb-8 rounded-2xl border border-error/30 bg-error/10 px-4 py-3 text-xs text-error">
+          Failed to fetch Firestore data for org {orgId}: {displayError}
+        </div>
+      )}
 
       <div className="flex flex-col space-y-24 w-full relative">
         {/* Top Section: Visualization & Alerts */}
@@ -93,7 +137,7 @@ export default function GraphRingsPage() {
           <div className="lg:col-span-3 min-h-[600px] h-full relative">
              <NetworkGraph 
                 transactions={activeTransactions} 
-                onNodeSelect={(node) => setSelectedNode(node)}
+                onNodeSelect={handleNodeSelect}
              />
           </div>
           
@@ -115,6 +159,14 @@ export default function GraphRingsPage() {
         transactions={activeTransactions} 
         onClose={() => setSelectedNode(null)} 
       />
+
+      {/* Forensic Simulator Panel */}
+      {selectedTransaction && (
+        <ForensicSimulatorPanel
+          transaction={selectedTransaction}
+          onClose={() => setSelectedTransaction(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }

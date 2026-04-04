@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import BrandLogo from "@/components/BrandLogo";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -15,9 +15,7 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
         <div className="flex flex-col items-center justify-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 animate-glow">
-            <ShieldAlert size={28} />
-          </div>
+          <BrandLogo size={48} className="rounded-2xl ring-1 ring-primary/20 animate-glow" />
           <h1 className="text-3xl font-bold tracking-tight font-outfit text-foreground mt-4">
             {title}
           </h1>

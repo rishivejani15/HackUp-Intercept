@@ -74,24 +74,24 @@ export default function LiveAlertPanel({ transactions }: LiveAlertPanelProps) {
              </div>
           ) : (
              alerts.map(alert => (
-               <div key={alert.id} className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-300 shadow-sm ${alert.color}`}>
-                  <div className="flex items-start justify-between">
-                     <h4 className={`text-xs font-bold font-space uppercase tracking-tight mb-2 flex items-center gap-2 ${alert.type === "AML" ? "text-slate-900" : "text-slate-900"}`}>
+               <div key={alert.id} className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-300 shadow-sm overflow-hidden ${alert.color}`}>
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                     <h4 className={`text-xs font-bold font-space uppercase tracking-tight mb-2 flex items-center gap-2 min-w-0 break-words ${alert.type === "AML" ? "text-slate-900" : "text-slate-900"}`}>
                         {alert.type === "RING" ? <Zap size={14} /> : alert.type === "AML" ? <TrendingUp size={14} className="text-[#a855f7]" /> : <AlertCircle size={14} />}
                         {alert.title}
                      </h4>
                   </div>
-                  <div className="flex flex-col gap-1.5 mb-2">
+                  <div className="flex flex-col gap-1.5 mb-2 min-w-0">
                      <div className="flex items-center gap-2">
                         <div className={`h-2 w-2 rounded-full ${alert.type === "AML" ? "bg-[#a855f7]" : "bg-[#ef4444]"}`} title="Node Status" />
-                        <p className="text-[10px] text-slate-600 font-mono">{alert.user || "ANALYST"}</p>
+                        <p className="text-[10px] text-slate-600 font-mono break-all leading-snug">{alert.user || "ANALYST"}</p>
                      </div>
-                     <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2 min-w-0">
                         <div className="h-2 w-2 rounded-full bg-[#6366f1]" title="Merchant Status" />
-                        <p className={`text-[10px] font-bold uppercase tracking-widest ${alert.type === "AML" ? "text-[#a855f7]" : "text-error"}`}>Target: {alert.merchant}</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest break-words leading-snug ${alert.type === "AML" ? "text-[#a855f7]" : "text-error"}`}>Target: {alert.merchant}</p>
                      </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">{alert.reason}</p>
+                  <p className="text-[10px] text-slate-500 break-words leading-snug">{alert.reason}</p>
                </div>
              ))
           )}

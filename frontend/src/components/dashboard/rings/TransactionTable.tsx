@@ -54,19 +54,19 @@ export default function TransactionTable({ transactions }: TransactionTableProps
                </tr>
             ) : transactions.map((t) => (
               <tr key={t.transaction_id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-6 py-4">
-                   <span className="font-mono text-xs text-slate-800">{t.transaction_id}</span>
+                 <td className="px-6 py-4 max-w-[14rem]">
+                   <span className="font-mono text-xs text-slate-800 break-all leading-snug block">{t.transaction_id}</span>
                 </td>
-                <td className="px-6 py-4">
-                   <div className="flex items-center gap-2">
-                     <span className="px-2 py-1 bg-slate-100 rounded text-[10px] text-slate-700">{t.user_id}</span>
+                 <td className="px-6 py-4 max-w-[18rem]">
+                   <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="px-2 py-1 bg-slate-100 rounded text-[10px] text-slate-700 break-all">{t.user_id}</span>
                      <ArrowRight size={12} className="text-slate-400" />
-                     <span className="px-2 py-1 bg-slate-100 rounded text-[10px] text-slate-700">{t.merchant_id}</span>
+                    <span className="px-2 py-1 bg-slate-100 rounded text-[10px] text-slate-700 break-all">{t.merchant_id}</span>
                    </div>
                 </td>
                 <td className="px-6 py-4 font-mono text-xs text-slate-800">${t.amount.toLocaleString()}</td>
                 <td className="px-6 py-4">
-                   <span className="text-[10px] uppercase text-white/60 tracking-wider">
+                   <span className="text-[10px] uppercase text-white/60 tracking-wider break-words">
                      {t.scenario_type.replace('_', ' ')}
                    </span>
                 </td>

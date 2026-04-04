@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Shield } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function LandingFooter() {
   return (
@@ -11,7 +11,7 @@ export default function LandingFooter() {
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-1 space-y-6">
             <Link href="/" className="flex items-center space-x-2">
-              <Shield className="text-primary" size={24} />
+              <BrandLogo size={24} className="rounded-lg ring-1 ring-black/10" />
               <span className="text-xl font-bold font-space tracking-tighter uppercase">InterceptAI</span>
             </Link>
             <p className="text-xs text-muted-foreground font-medium leading-relaxed max-w-[200px]">

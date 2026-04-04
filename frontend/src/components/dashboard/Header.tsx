@@ -5,28 +5,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
-  ShieldAlert, 
   FileText, 
-  Newspaper, 
-  Users, 
   Settings,
   Search,
   LogOut,
   ChevronDown,
-  CreditCard,
   Network,
   User
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import BrandLogo from "@/components/BrandLogo";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "ThreatGuard", icon: ShieldAlert, href: "/dashboard/alerts" },
   { label: "Graph Rings", icon: Network, href: "/dashboard/rings" },
-  { label: "News", icon: Newspaper, href: "/dashboard/news" },
-  { label: "Community", icon: Users, href: "/dashboard/community" },
-  { label: "Ledger", icon: CreditCard, href: "/dashboard/transactions" },
   { label: "Simulator", icon: FileText, href: "/test-simulator" },
 ];
 
@@ -52,10 +45,7 @@ export default function Header() {
       <div className="mx-auto flex h-20 items-center justify-between px-6 lg:px-10">
         {/* Left: Branding */}
         <div className="flex items-center space-x-3 group cursor-pointer">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary animate-glow">
-            <ShieldAlert size={22} strokeWidth={2.5} />
-            <div className="absolute inset-0 rounded-xl border border-black/15" />
-          </div>
+          <BrandLogo size={40} className="animate-glow ring-1 ring-black/15" />
           <div className="flex flex-col">
             <span className="text-lg font-bold font-space tracking-tight text-foreground leading-none">
               INTERCEPT<span className="text-primary opacity-80">AI</span>
